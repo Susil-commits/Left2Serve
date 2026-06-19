@@ -9,7 +9,7 @@ export default function ImageUpload({ onUpload, images = [], onRemove }) {
   const uploadFiles = async (files) => {
     setUploading(true);
     try { const formData = new FormData(); files.forEach(f => formData.append('images', f)); const data = await api.listings.upload(formData); onUpload([...images, ...data.urls]); }
-    catch (err) { alert('Upload failed: ' + err.message); }
+    catch (err) { console.error('Upload failed:', err.message); }
     finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 

@@ -5,6 +5,7 @@ import { useAuth } from '../components/AuthContext';
 export default function Login() {
   const [searchParams] = useSearchParams();
   const isRegistered = searchParams.get('registered') === 'true';
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
   const prefillEmail = isRegistered ? sessionStorage.getItem('prefill_email') || '' : '';
   const prefillPassword = isRegistered ? sessionStorage.getItem('prefill_password') || '' : '';
   if (isRegistered) {
@@ -28,7 +29,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/dashboard');
+      navigate(redirectTo);
     } catch (err) {
       setError(err.message);
     } finally {

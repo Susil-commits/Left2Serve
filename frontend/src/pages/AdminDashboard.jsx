@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api';
+import { useToast } from '../components/Toast';
 
 const tabs = ['Overview', 'Users', 'NGOs', 'Orders', 'Listings'];
 
@@ -22,6 +23,7 @@ export default function AdminDashboard() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
+  const { addToast } = useToast();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -31,9 +33,9 @@ export default function AdminDashboard() {
         api.admin.orders(), api.admin.listings()
       ]);
       setStats(s); setUsers(u); setNgos(n); setOrders(o); setListings(l);
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error(err); addToast('Failed to load data', 'error'); }
     setLoading(false);
-  }, []);
+  }, [addToast]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -45,7 +47,7 @@ export default function AdminDashboard() {
     try {
       await api.admin.updateOrder(id, { status });
       await loadData();
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error(err); addToast('Failed to load data', 'error'); }
     setActionLoading(null);
   };
 

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { get, insert } from '../db/database.js';
+import { get, insert, run } from '../db/database.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
@@ -34,6 +34,32 @@ router.get('/me', authMiddleware, async (req, res) => {
   const user = await get('SELECT id, name, email, role, phone, address, organization, created_at FROM users WHERE id = ?', [req.user.id]);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json(user);
+});
+
+router.put('/profile', authMiddleware, async (req, res) => {
+  const { name, phone, address, organization } = req.body;
+  try {
+    await run('UPDATE users SET name = ?, phone = ?, address = ?, organization = ? WHERE id = ?', [name || null, phone || null, address || null, organization || null, req.user.id]);
+    const user = await get('SELECT id, name, email, role, phone, address, organization, created_at FROM users WHERE id = ?', [req.user.id]);
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+router.put('/password', authMiddleware, async (req, res) => {
+  const { current, newPass } = req.body;
+  if (!current || !newPass) return res.status(400).json({ error: 'Current and new password are required' });
+  if (newPass.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  try {
+    const user = await get('SELECT password_hash FROM users WHERE id = ?', [req.user.id]);
+    if (!bcrypt.compareSync(current, user.password_hash)) return res.status(401).json({ error: 'Current password is incorrect' });
+    const password_hash = bcrypt.hashSync(newPass, 10);
+    await run('UPDATE users SET password_hash = ? WHERE id = ?', [password_hash, req.user.id]);
+    res.json({ message: 'Password updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update password' });
+  }
 });
 
 export default router;

@@ -16,9 +16,10 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => { const data = await api.auth.login({ email, password }); localStorage.setItem('token', data.token); setUser(data.user); return data.user; };
   const register = async (userData) => { const data = await api.auth.register(userData); localStorage.setItem('token', data.token); setUser(data.user); return data.user; };
   const adminLogin = async (adminCode) => { const data = await api.admin.login({ adminCode }); localStorage.setItem('token', data.token); setUser(data.user); return data.user; };
+  const updateUser = async (userData) => { setUser(prev => ({ ...prev, ...userData })); };
   const logout = () => { localStorage.removeItem('token'); setUser(null); };
 
-  return <AuthContext.Provider value={{ user, loading, login, register, adminLogin, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, login, register, adminLogin, updateUser, logout }}>{children}</AuthContext.Provider>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

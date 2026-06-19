@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 const useScrollReveal = () => {
   useEffect(() => {
@@ -7,6 +7,48 @@ const useScrollReveal = () => {
     document.querySelectorAll('.reveal, .reveal-left, .reveal-right').forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
+};
+
+const useCountUp = (target, duration = 2000, startCounting = true) => {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!startCounting) return;
+    let start = 0;
+    const increment = target / (duration / 16);
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= target) { setCount(target); clearInterval(timer); }
+      else { setCount(Math.floor(start)); }
+    }, 16);
+    return () => clearInterval(timer);
+  }, [target, duration, startCounting]);
+  return count;
+};
+
+const AnimatedStat = ({ value, label, suffix = '+' }) => {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.5 });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
+  const count = useCountUp(value, 2000, visible);
+  return (
+    <div ref={ref}><div className="text-2xl font-bold text-text highlight-number">{count}{suffix}</div><div className="text-sm text-subtle">{label}</div></div>
+  );
+};
+
+const AnimatedStatInline = ({ value, suffix = '+' }) => {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.5 });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
+  const count = useCountUp(value, 2000, visible);
+  return <span ref={ref} className="highlight-number">{count.toLocaleString()}{suffix}</span>;
 };
 
 const partners = ['Feeding India', 'Robin Hood Army', 'Akshaya Patra', 'No Food Waste', 'Rise Against Hunger', 'Food Bank India', 'ShareTheMeal', 'Zomato Feeding', 'Swiggy Serves', 'Khaana Chahiye'];
@@ -17,17 +59,17 @@ const testimonials = [
   { quote: 'The platform connects us directly with local businesses. We have reduced food waste by 70% since joining.', name: 'Vikram Patel', role: 'NGO Coordinator', initials: 'VP' },
 ];
 const categories = [
-  { icon: '🍲', label: 'Cooked Meals', count: '1,200+', desc: 'Freshly prepared meals from restaurants and caterers', link: '/browse?category=cooked' },
-  { icon: '🥖', label: 'Bakery Items', count: '800+', desc: 'Bread, pastries, and baked goods', link: '/browse?category=bakery' },
-  { icon: '🥬', label: 'Fresh Produce', count: '600+', desc: 'Fruits and vegetables from markets', link: '/browse?category=produce' },
-  { icon: '🥫', label: 'Packaged Food', count: '450+', desc: 'Canned goods, grains, non-perishables', link: '/browse?category=packaged' },
-  { icon: '🥤', label: 'Beverages', count: '300+', desc: 'Juices, water, packaged drinks', link: '/browse?category=beverages' },
+  { icon: '🎉', label: 'Events', count: '1,200+', desc: 'Surplus food from weddings, conferences, and parties', link: '/browse?category=event' },
+  { icon: '🍽️', label: 'Restaurants', count: '800+', desc: 'Fresh meals from local restaurants and eateries', link: '/browse?category=restaurant' },
+  { icon: '🏨', label: 'Hotels', count: '600+', desc: 'Buffet leftovers and banquet surplus', link: '/browse?category=hotel' },
+  { icon: '🍱', label: 'Caterers', count: '450+', desc: 'Catered meals and event leftovers', link: '/browse?category=caterer' },
+  { icon: '🏠', label: 'Households', count: '300+', desc: 'Home-cooked surplus and groceries', link: '/browse?category=household' },
 ];
 const faqItems = [
   { q: 'How does Left2Serve work?', a: 'Food donors list surplus food with details like quantity, type, and pickup location. Nearby receivers and volunteers are notified instantly and can claim the listing for pickup.' },
   { q: 'Is the platform free to use?', a: 'Yes! Left2Serve is completely free for both donors and receivers. We believe in making food redistribution accessible to everyone without any barriers.' },
   { q: 'Who can donate food?', a: 'Restaurants, caterers, grocery stores, bakeries, event organizers, and individuals with surplus food that is safe to consume can donate.' },
-  { q: 'How is food safety ensured?', a: 'Donors verify food safety. We provide guidelines on storage, handling, and transportation. Receivers can rate and report listings for quality assurance.' },
+  { q: 'How is food safety ensured?', a: 'Donors are responsible for verifying food safety. We provide guidelines on proper storage, handling, and transportation. All listings include expiry dates and pickup instructions.' },
   { q: 'How do I track my donations?', a: 'Our dashboard provides real-time tracking of all donations, including pickup status, receiver details, and impact metrics. See how many meals you have helped save.' },
 ];
 
@@ -54,9 +96,9 @@ export default function Home() {
                 <Link to="/browse" className="btn-outline">Browse Listings</Link>
               </div>
               <div className="flex gap-8 mt-10 pt-8 border-t border-border">
-                {[{ value: '10K+', label: 'Meals Saved' }, { value: '500+', label: 'Active Donors' }, { value: '200+', label: 'Receivers' }].map((s) => (
-                  <div key={s.label}><div className="text-2xl font-bold text-text highlight-number">{s.value}</div><div className="text-sm text-subtle">{s.label}</div></div>
-                ))}
+                <AnimatedStat value={10000} label="Meals Saved" />
+                <AnimatedStat value={500} label="Active Donors" />
+                <AnimatedStat value={200} label="Receivers" />
               </div>
             </div>
             <div className="reveal-right relative flex justify-center">
@@ -81,8 +123,8 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-8 relative timeline-line">
             {[
               { step: '01', icon: '📋', title: 'List Your Food', desc: 'Post surplus food with details', features: ['Quantity & type', 'Pickup location', 'Expiry time', 'Photo upload'] },
-              { step: '02', icon: '🔔', title: 'Get Matched', desc: 'Nearby receivers are notified instantly', features: ['Real-time alerts', 'Smart matching', 'Distance filter', 'Auto-notify'] },
-              { step: '03', icon: '🤝', title: 'Pickup & Complete', desc: 'Coordinate and confirm pickup', features: ['In-app chat', 'Live tracking', 'Rating system', 'Impact report'] },
+              { step: '02', icon: '🔔', title: 'Get Matched', desc: 'Nearby receivers browse and reserve', features: ['Browse listings', 'Smart filtering', 'Category search', 'Instant reservations'] },
+              { step: '03', icon: '🤝', title: 'Pickup & Complete', desc: 'Coordinate and confirm pickup', features: ['Pickup coordination', 'Status tracking', 'Order management', 'Impact dashboard'] },
             ].map((item, i) => (
               <div key={i} className="premium-card card-hover-lift p-8 relative z-10 reveal" style={{ transitionDelay: `${i * 0.15}s` }}>
                 <div className="flex items-center justify-between mb-5"><div className="icon-circle">{item.icon}</div><span className="text-4xl font-extrabold text-accent/8">{item.step}</span></div>
@@ -143,6 +185,27 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="py-24 bg-accent/[0.015]">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-16 reveal"><span className="section-badge">Our Impact</span><h2 className="section-title mb-4">Making a Real <span className="gradient-text-static">Difference</span></h2><p className="section-subtitle mx-auto">Every meal shared creates a ripple effect of positive change in communities.</p></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { value: 10000, label: 'Meals Saved', icon: '🍽️', desc: 'Redirected from waste to plates' },
+              { value: 500, label: 'Active Donors', icon: '🏪', desc: 'Businesses & individuals giving back' },
+              { value: 200, label: 'NGOs Served', icon: '🏛️', desc: 'Shelters & community kitchens' },
+              { value: 15000, label: 'kg CO₂ Saved', icon: '🌍', desc: 'Reduced food waste emissions' },
+            ].map((item, i) => (
+              <div key={i} className="premium-card p-6 text-center reveal" style={{ transitionDelay: `${i * 0.1}s` }}>
+                <div className="text-4xl mb-3">{item.icon}</div>
+                <div className="text-3xl font-black text-text tracking-tight mb-1"><AnimatedStatInline value={item.value} /></div>
+                <div className="text-sm font-semibold text-text mb-1">{item.label}</div>
+                <div className="text-xs text-subtle">{item.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="py-16 overflow-hidden border-y border-border">
         <div className="max-w-7xl mx-auto px-6"><div className="text-center reveal mb-10"><span className="section-badge">Our Partners</span><h2 className="text-2xl font-bold text-text mt-3">Trusted by Leading Organizations</h2></div></div>
         <div className="flex animate-marquee gap-16">{[...partners, ...partners].map((p, i) => <span key={i} className="text-xl font-bold text-muted whitespace-nowrap select-none hover:text-accent transition-colors cursor-default">{p}</span>)}</div>
@@ -179,22 +242,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      <footer className="bg-text text-white py-16">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
-            <div className="reveal-left">
-              <div className="flex items-center gap-2 mb-4"><span className="text-2xl">🍽️</span><span className="text-xl font-bold">Left2Serve</span></div>
-              <p className="text-white/60 text-sm leading-relaxed mb-4">Connecting surplus food with communities in need. Together, we can end hunger and reduce waste.</p>
-              <div className="flex gap-4 text-white/40 text-sm"><span className="hover:text-white cursor-pointer transition-colors">Twitter</span><span className="hover:text-white cursor-pointer transition-colors">LinkedIn</span><span className="hover:text-white cursor-pointer transition-colors">Instagram</span></div>
-            </div>
-            <div className="reveal" style={{ transitionDelay: '0.1s' }}><h4 className="font-semibold text-white mb-4">Platform</h4><div className="space-y-2 text-white/60 text-sm"><div><Link to="/browse" className="hover:text-white transition-colors">Browse Food</Link></div><div><Link to="/list-food" className="hover:text-white transition-colors">List Food</Link></div><div><Link to="/dashboard" className="hover:text-white transition-colors">Dashboard</Link></div><div><span className="hover:text-white cursor-pointer transition-colors">How It Works</span></div></div></div>
-            <div className="reveal" style={{ transitionDelay: '0.2s' }}><h4 className="font-semibold text-white mb-4">Company</h4><div className="space-y-2 text-white/60 text-sm"><div><span className="hover:text-white cursor-pointer transition-colors">About Us</span></div><div><span className="hover:text-white cursor-pointer transition-colors">Blog</span></div><div><span className="hover:text-white cursor-pointer transition-colors">Careers</span></div><div><span className="hover:text-white cursor-pointer transition-colors">Contact</span></div></div></div>
-            <div className="reveal-right"><h4 className="font-semibold text-white mb-4">Contact</h4><div className="space-y-2 text-white/60 text-sm"><div>hello@left2serve.org</div><div>+91 98765 43210</div><div>Bangalore, India</div><div className="badge badge-red inline-flex mt-2">Available 24/7</div></div></div>
-          </div>
-          <div className="mt-12 pt-8 border-t border-white/10 text-center text-white/40 text-sm">&copy; {new Date().getFullYear()} Left2Serve. All rights reserved. Made with ❤️ for the community. <Link to="/login" className="text-white/20 hover:text-white/40 transition-colors ml-2">Admin</Link></div>
-        </div>
-      </footer>
     </div>
   );
 }

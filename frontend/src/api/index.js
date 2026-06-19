@@ -19,6 +19,8 @@ export const api = {
     register: (body) => request('/auth/register', { method: 'POST', body }),
     login: (body) => request('/auth/login', { method: 'POST', body }),
     me: () => request('/auth/me'),
+    updateProfile: (body) => request('/auth/profile', { method: 'PUT', body }),
+    changePassword: (body) => request('/auth/password', { method: 'PUT', body }),
   },
   listings: {
     getAll: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/listings${qs ? `?${qs}` : ''}`); },
