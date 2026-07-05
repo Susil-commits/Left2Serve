@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import Lightbox from '../components/Lightbox';
+import StarRating from '../components/StarRating';
 
 const categoryLabels = { event: 'Event', restaurant: 'Restaurant', hotel: 'Hotel', caterer: 'Caterer', household: 'Household' };
 const categoryIcons = { event: '🎉', restaurant: '🍽️', hotel: '🏨', caterer: '🍱', household: '🏠' };
@@ -32,14 +33,24 @@ export default function FoodDetail() {
   const [message, setMessage] = useState('');
   const [activeImage, setActiveImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [donorRating, setDonorRating] = useState(null);
+  const [closing, setClosing] = useState(false);
+
+  const loadListing = useCallback(async () => {
+    try {
+      const data = await api.listings.getOne(id);
+      setListing(data);
+      try { setDonorRating(await api.reviews.forUser(data.user_id)); } catch { setDonorRating(null); }
+    } catch { setError('Listing not found'); }
+    finally { setLoading(false); }
+  }, [id]);
 
   useEffect(() => {
-    (async () => {
-      try { setListing(await api.listings.getOne(id)); }
-      catch { setError('Listing not found'); }
-      finally { setLoading(false); }
-    })();
-  }, [id]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setError('');
+    loadListing();
+  }, [loadListing]);
 
   const handleReserve = async (e) => {
     e.preventDefault();
@@ -48,13 +59,27 @@ export default function FoodDetail() {
     try {
       await api.reservations.create({ food_listing_id: listing.id, quantity: parseInt(quantity), pickup_time: pickupTime || null, notes: notes || null });
       setMessage('Reservation confirmed!');
-      setListing({ ...listing, status: 'reserved' });
       addToast('Food reserved successfully', 'success');
+      await loadListing();
     } catch (err) {
       setError(err.message);
       addToast(err.message, 'error');
     }
     setReserving(false);
+  };
+
+  const handleClose = async () => {
+    const ok = await confirm({ title: 'Mark as donated?', message: 'This records the listing as donated/collected without a reservation. This cannot be undone.', confirmLabel: 'Mark Donated', variant: 'danger' });
+    if (!ok) return;
+    setClosing(true);
+    try {
+      await api.listings.close(id);
+      addToast('Listing marked as donated', 'success');
+      navigate('/dashboard');
+    } catch (err) {
+      addToast(err.message, 'error');
+    }
+    setClosing(false);
   };
 
   const handleDelete = async () => {
@@ -87,7 +112,8 @@ export default function FoodDetail() {
   );
 
   const isOwner = user && user.id === listing.user_id;
-  const canReserve = user && (user.role === 'ngo' || user.role === 'volunteer') && listing.status === 'available';
+  const remaining = listing.remaining != null ? Number(listing.remaining) : Number(listing.quantity);
+  const canReserve = user && (user.role === 'ngo' || user.role === 'volunteer') && listing.status === 'available' && remaining > 0;
   const status = statusConfig[listing.status] || statusConfig.available;
   const isExpired = new Date(listing.expiry_date) < new Date();
 
@@ -143,14 +169,16 @@ export default function FoodDetail() {
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 p-6 bg-gray-50 rounded-2xl border border-border">
             {[
-              { label: 'Quantity', value: `${listing.quantity} ${listing.unit}`, icon: '📦' },
+              { label: 'Quantity', value: `${listing.quantity} ${listing.unit}`, sub: listing.status === 'available' && remaining < listing.quantity ? `${remaining} available` : null, icon: '📦' },
               { label: 'Price', value: listing.price > 0 ? `$${listing.price}` : 'Free', icon: '💰', highlight: listing.price === 0 },
               { label: 'Expires', value: new Date(listing.expiry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }), icon: '⏰' },
-              { label: 'Donor', value: listing.donor_org || listing.donor_name, icon: '👤' },
+              { label: 'Donor', value: listing.donor_org || listing.donor_name, icon: '👤', rating: donorRating },
             ].map((item, i) => (
               <div key={i}>
                 <div className="text-muted text-xs mb-1 font-medium flex items-center gap-1"><span className="text-sm">{item.icon}</span> {item.label}</div>
                 <div className={`font-semibold text-sm ${item.highlight ? 'text-emerald-600' : 'text-text'}`}>{item.value}</div>
+                {item.sub && <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">{item.sub}</div>}
+                {item.rating && item.rating.count > 0 && <div className="mt-1"><StarRating value={item.rating.average} size="sm" showValue count={item.rating.count} /></div>}
               </div>
             ))}
           </div>
@@ -189,8 +217,13 @@ export default function FoodDetail() {
           )}
 
           {isOwner && listing.status !== 'collected' && (
-            <div className="mb-6 flex gap-3">
+            <div className="mb-6 flex gap-3 flex-wrap">
               <Link to={`/edit-food/${listing.id}`} className="flex-1 px-4 py-3 bg-gray-50 border border-border text-text rounded-2xl text-sm font-semibold hover:bg-gray-100 transition-colors text-center">Edit Listing</Link>
+              {listing.status === 'available' && (
+                <button onClick={handleClose} disabled={closing} className="flex-1 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-2xl text-sm font-semibold hover:bg-blue-100 transition-colors disabled:opacity-50">
+                  {closing ? 'Marking...' : 'Mark Donated'}
+                </button>
+              )}
               <button onClick={handleDelete} className="flex-1 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm font-semibold hover:bg-red-100 transition-colors">Delete Listing</button>
             </div>
           )}
@@ -214,9 +247,9 @@ export default function FoodDetail() {
                 <div>
                   <label className="block text-sm font-semibold text-text mb-2">Quantity</label>
                   <div className="relative">
-                    <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, Math.min(listing.quantity, parseInt(e.target.value) || 1)))}
-                      min={1} max={listing.quantity} required className="input-field" />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">/ {listing.quantity}</span>
+                    <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, Math.min(remaining, parseInt(e.target.value) || 1)))}
+                      min={1} max={remaining} required className="input-field" />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">/ {remaining}</span>
                   </div>
                 </div>
                 <div>
@@ -234,7 +267,7 @@ export default function FoodDetail() {
             </form>
           )}
 
-          {!user && listing.status === 'available' && (
+          {!user && listing.status === 'available' && remaining > 0 && (
             <div className="border-t border-border pt-6 text-center">
               <p className="text-subtle mb-4 font-medium">Sign in to reserve this food</p>
               <button onClick={() => navigate('/login')} className="btn-primary !py-2 !px-6 !text-sm !rounded-xl">Sign In to Reserve</button>

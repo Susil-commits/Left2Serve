@@ -49,6 +49,7 @@ export default function Navbar() {
 
             <div className="hidden md:flex items-center gap-1">
               <Link to="/browse" aria-label="Browse food listings" className={`btn-ghost ${isActive('/browse')}`}>Browse</Link>
+              <Link to="/impact" aria-label="Community impact" className={`btn-ghost ${isActive('/impact')}`}>Impact</Link>
               <Link to="/saved" aria-label={`Saved listings${favCount ? ` (${favCount})` : ''}`} className={`btn-ghost relative ${isSavedActive()}`}>
                 Saved
                 {favCount > 0 && <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-accent text-white text-[9px] font-bold flex items-center justify-center">{favCount > 9 ? '9+' : favCount}</span>}
@@ -88,6 +89,7 @@ export default function Navbar() {
           <div className="md:hidden glass border-t border-border animate-slide-down">
             <div className="px-4 py-4 space-y-2">
               <Link to="/browse" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/browse')}`}>Browse</Link>
+              <Link to="/impact" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/impact')}`}>Impact</Link>
               <Link to="/saved" onClick={closeMobile} className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isSavedActive()}`}>
                 <span>Saved</span>
                 {favCount > 0 && <span className="min-w-4 h-4 px-1 rounded-full bg-accent text-white text-[9px] font-bold flex items-center justify-center">{favCount > 9 ? '9+' : favCount}</span>}

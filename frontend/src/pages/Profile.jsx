@@ -3,6 +3,7 @@ import { useAuth } from '../components/AuthContext';
 import { api } from '../api';
 import { useToast } from '../components/Toast';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
+import StarRating from '../components/StarRating';
 
 export default function Profile() {
   const { user, updateUser, changePassword } = useAuth();
@@ -18,6 +19,8 @@ export default function Profile() {
   const [showPassword, setShowPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ current: '', newPass: '', confirm: '' });
   const [changingPassword, setChangingPassword] = useState(false);
+  const [impact, setImpact] = useState(null);
+  const [reviews, setReviews] = useState({ average: 0, count: 0, reviews: [] });
 
   useEffect(() => {
     if (user && !editing) {
@@ -30,6 +33,14 @@ export default function Profile() {
       });
     }
   }, [user, editing]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (user.role !== 'admin') {
+      api.auth.impact().then(setImpact).catch(() => {});
+      if (user.id) api.reviews.forUser(user.id).then(setReviews).catch(() => {});
+    }
+  }, [user]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -144,6 +155,57 @@ export default function Profile() {
         )}
       </div>
 
+      {impact && (
+        <div className="premium-card-elevated p-6 sm:p-8 mt-6 animate-fade-in-up">
+          <div className="flex items-center gap-2 mb-5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <h3 className="text-lg font-bold text-text">Your Impact</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {impact.role === 'donor' ? (
+              <>
+                <ImpactStat value={impact.mealsDonated} label="Meals Donated" icon="🍽️" />
+                <ImpactStat value={impact.listingsCreated} label="Listings Posted" icon="📋" />
+                <ImpactStat value={impact.activeListings} label="Active Now" icon="🟢" />
+                <ImpactStat value={impact.co2Kg} label="kg CO₂ Avoided" icon="🌱" />
+              </>
+            ) : (
+              <>
+                <ImpactStat value={impact.mealsReceived} label="Meals Received" icon="🍽️" />
+                <ImpactStat value={impact.reservationsMade} label="Reservations" icon="📦" />
+                <ImpactStat value={impact.co2Kg} label="kg CO₂ Avoided" icon="🌱" />
+                <ImpactStat value={impact.mealsReceived * 1250} label="L Water Saved" icon="💧" />
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {user?.role !== 'admin' && (
+        <div className="premium-card-elevated p-6 sm:p-8 mt-6 animate-fade-in-up">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-text">Reviews</h3>
+            {reviews.count > 0 && <StarRating value={reviews.average} size="sm" showValue count={reviews.count} />}
+          </div>
+          {reviews.count === 0 ? (
+            <p className="text-subtle text-sm">No reviews yet. Reviews appear here after completed pickups transactions.</p>
+          ) : (
+            <div className="space-y-3">
+              {reviews.reviews.map((rv) => (
+                <div key={rv.id} className="bg-gray-50 rounded-2xl p-4 border border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-semibold text-text">{rv.reviewer_name || 'Anonymous'}</div>
+                    <StarRating value={rv.rating} size="sm" />
+                  </div>
+                  {rv.comment && <p className="text-subtle text-sm leading-relaxed">{rv.comment}</p>}
+                  {rv.food_title && <p className="text-xs text-muted mt-2">on "{rv.food_title}"</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="premium-card-elevated p-6 sm:p-8 mt-6 animate-fade-in-up">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-text">Password</h3>
@@ -177,6 +239,16 @@ export default function Profile() {
           </form>
         )}
       </div>
+    </div>
+  );
+}
+
+function ImpactStat({ value, label, icon }) {
+  return (
+    <div className="bg-gray-50 rounded-2xl p-4 border border-border text-center">
+      <div className="text-2xl mb-1">{icon}</div>
+      <div className="text-2xl font-black text-text">{Number(value || 0).toLocaleString()}</div>
+      <div className="text-xs text-subtle font-medium mt-1">{label}</div>
     </div>
   );
 }

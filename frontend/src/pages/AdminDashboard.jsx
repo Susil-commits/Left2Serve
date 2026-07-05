@@ -35,6 +35,7 @@ export default function AdminDashboard() {
   const [actionLoading, setActionLoading] = useState(null);
   const [userLoading, setUserLoading] = useState(null);
   const [query, setQuery] = useState('');
+  const [resetResult, setResetResult] = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -99,6 +100,29 @@ export default function AdminDashboard() {
     try { await api.admin.deleteUser(u.id); addToast('User deleted', 'success'); await loadData(); }
     catch (err) { addToast(err.message || 'Failed to delete user', 'error'); }
     setUserLoading(null);
+  };
+
+  const handleResetPassword = async (u) => {
+    const ok = await confirm({ title: `Reset ${u.name}'s password?`, message: 'A temporary password will be generated and all their active sessions will be signed out. Share the new password securely with the user.', confirmLabel: 'Reset Password', variant: 'danger' });
+    if (!ok) return;
+    setUserLoading(`pw-${u.id}`);
+    try {
+      const res = await api.admin.resetUserPassword(u.id, {});
+      if (res.password) setResetResult({ name: u.name, email: u.email, password: res.password });
+      addToast('Password reset successfully', 'success');
+    } catch (err) {
+      addToast(err.message || 'Failed to reset password', 'error');
+    }
+    setUserLoading(null);
+  };
+
+  const handleDeleteListing = async (l) => {
+    const ok = await confirm({ title: 'Delete this listing?', message: `"${l.title}" will be permanently removed and the donor notified. This cannot be undone.`, confirmLabel: 'Delete Listing', variant: 'danger' });
+    if (!ok) return;
+    setActionLoading(`del-listing-${l.id}`);
+    try { await api.admin.deleteListing(l.id); addToast('Listing deleted', 'success'); await loadData(); }
+    catch (err) { addToast(err.message || 'Failed to delete listing', 'error'); }
+    setActionLoading(null);
   };
 
   const handleLogout = async () => {
@@ -318,10 +342,14 @@ export default function AdminDashboard() {
                             {u.role === 'admin' ? (
                               <span className="text-xs text-muted">—</span>
                             ) : (
-                              <div className="flex gap-1.5">
+                              <div className="flex gap-1.5 flex-wrap">
                                 <button onClick={() => handleToggleActive(u)} disabled={userLoading === u.id}
                                   className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 ${u.is_active === false ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}>
                                   {userLoading === u.id ? '...' : u.is_active === false ? 'Activate' : 'Suspend'}
+                                </button>
+                                <button onClick={() => handleResetPassword(u)} disabled={userLoading === `pw-${u.id}`}
+                                  className="px-2.5 py-1.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50">
+                                  {userLoading === `pw-${u.id}` ? '...' : 'Reset PW'}
                                 </button>
                                 <button onClick={() => handleDeleteUser(u)} disabled={userLoading === u.id}
                                   className="px-2.5 py-1.5 bg-red-50 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50">
@@ -506,6 +534,7 @@ export default function AdminDashboard() {
                           <th className="text-left py-3 px-4 text-xs font-semibold text-subtle uppercase tracking-wider">Qty</th>
                           <th className="text-left py-3 px-4 text-xs font-semibold text-subtle uppercase tracking-wider">Status</th>
                           <th className="text-left py-3 px-4 text-xs font-semibold text-subtle uppercase tracking-wider">Expiry</th>
+                          <th className="text-left py-3 px-4 text-xs font-semibold text-subtle uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -521,9 +550,15 @@ export default function AdminDashboard() {
                               </span>
                             </td>
                             <td className="py-3 px-4 text-sm text-subtle">{new Date(l.expiry_date).toLocaleDateString()}</td>
+                            <td className="py-3 px-4">
+                              <button onClick={() => handleDeleteListing(l)} disabled={actionLoading === `del-listing-${l.id}`}
+                                className="px-3 py-1.5 bg-red-50 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50">
+                                {actionLoading === `del-listing-${l.id}` ? '...' : 'Delete'}
+                              </button>
+                            </td>
                           </tr>
                         ))}
-                        {filteredListings.length === 0 && <tr><td colSpan={6} className="text-subtle text-sm text-center py-12">No listings found</td></tr>}
+                        {filteredListings.length === 0 && <tr><td colSpan={7} className="text-subtle text-sm text-center py-12">No listings found</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -571,6 +606,21 @@ export default function AdminDashboard() {
           </>
         )}
       </div>
+
+      {resetResult && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-fade-in" role="dialog" aria-modal="true" aria-labelledby="pw-title">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setResetResult(null)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl max-w-md w-full p-7 animate-scale-in">
+            <h3 id="pw-title" className="text-lg font-bold text-text">Temporary password</h3>
+            <p className="text-subtle text-sm mt-1.5">A new password was generated for <span className="font-semibold text-text">{resetResult.name}</span> ({resetResult.email}). Share it securely — it won't be shown again.</p>
+            <div className="mt-5 bg-gray-50 border border-border rounded-2xl p-4 flex items-center justify-between gap-3">
+              <code className="text-text font-mono text-base break-all select-all">{resetResult.password}</code>
+              <button onClick={() => { navigator.clipboard?.writeText(resetResult.password); addToast('Copied to clipboard', 'success'); }} className="btn-outline !py-2 !px-3 !text-xs !rounded-lg flex-shrink-0">Copy</button>
+            </div>
+            <button onClick={() => setResetResult(null)} className="btn-primary w-full !py-3 !rounded-2xl mt-5">Done</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

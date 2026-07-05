@@ -80,6 +80,28 @@ router.get('/me', authMiddleware, async (req, res) => {
   res.json(user);
 });
 
+router.get('/impact', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role === 'donor') {
+      const [mealsRow] = await all("SELECT COALESCE(SUM(r.quantity), 0) AS total FROM reservations r JOIN food_listings fl ON r.food_listing_id = fl.id WHERE fl.user_id = ? AND r.status = 'collected'", [req.user.id]);
+      const [listingsRow] = await all('SELECT COUNT(*) AS count FROM food_listings WHERE user_id = ?', [req.user.id]);
+      const [activeRow] = await all("SELECT COUNT(*) AS count FROM food_listings WHERE user_id = ? AND status = 'available'", [req.user.id]);
+      const [reservationsRow] = await all('SELECT COUNT(*) AS count FROM reservations r JOIN food_listings fl ON r.food_listing_id = fl.id WHERE fl.user_id = ?', [req.user.id]);
+      const meals = Number(mealsRow.total) || 0;
+      res.json({ role: 'donor', mealsDonated: meals, listingsCreated: listingsRow.count, activeListings: activeRow.count, reservationsReceived: reservationsRow.count, co2Kg: Math.round(meals * 2.5) });
+    } else if (req.user.role === 'ngo' || req.user.role === 'volunteer') {
+      const [mealsRow] = await all("SELECT COALESCE(SUM(quantity), 0) AS total FROM reservations WHERE user_id = ? AND status = 'collected'", [req.user.id]);
+      const [reservationsRow] = await all('SELECT COUNT(*) AS count FROM reservations WHERE user_id = ?', [req.user.id]);
+      const meals = Number(mealsRow.total) || 0;
+      res.json({ role: req.user.role, mealsReceived: meals, reservationsMade: reservationsRow.count, co2Kg: Math.round(meals * 2.5) });
+    } else {
+      res.json({ role: 'admin' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch impact' });
+  }
+});
+
 router.put('/profile', authMiddleware, async (req, res) => {
   const { name, phone, address, organization } = req.body;
   if (name !== undefined && String(name).trim().length < 2) return res.status(400).json({ error: 'Name is too short' });

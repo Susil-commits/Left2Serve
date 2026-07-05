@@ -1,9 +1,11 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { get, all, run } from '../db/database.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 import { createNotification } from '../db/notify.js';
 import { audit } from '../db/audit.js';
+import { recomputeListingStatus } from '../db/availability.js';
 
 const router = Router();
 const ADMIN_CODE = process.env.ADMIN_CODE;
@@ -95,6 +97,19 @@ router.get('/listings', authMiddleware, roleMiddleware('admin'), async (req, res
   }
 });
 
+router.delete('/listings/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+  try {
+    const listing = await get('SELECT id, user_id, title, status FROM food_listings WHERE id = ?', [req.params.id]);
+    if (!listing) return res.status(404).json({ error: 'Listing not found' });
+    await run('DELETE FROM food_listings WHERE id = ?', [req.params.id]);
+    await createNotification(listing.user_id, 'listing_removed', 'Listing removed', `An admin removed your listing "${listing.title}".`, { listingId: Number(req.params.id) });
+    await adminAudit(req, 'listing_delete', 'listing', Number(req.params.id), `removed listing "${listing.title}" (${listing.status})`);
+    res.json({ message: 'Listing deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete listing' });
+  }
+});
+
 router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
   try {
     const { status } = req.body;
@@ -103,8 +118,7 @@ router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), async (req,
     const reservation = await get('SELECT * FROM reservations WHERE id = ?', [req.params.id]);
     if (!reservation) return res.status(404).json({ error: 'Order not found' });
     await run('UPDATE reservations SET status = ? WHERE id = ?', [status, req.params.id]);
-    if (status === 'collected') await run("UPDATE food_listings SET status = 'collected' WHERE id = ?", [reservation.food_listing_id]);
-    else if (status === 'cancelled') await run("UPDATE food_listings SET status = 'available' WHERE id = ?", [reservation.food_listing_id]);
+    await recomputeListingStatus(reservation.food_listing_id);
     const info = await get('SELECT title FROM food_listings WHERE id = ?', [reservation.food_listing_id]);
     const ctx = { reservationId: reservation.id, listingId: reservation.food_listing_id };
     const title = info?.title;
@@ -158,6 +172,30 @@ router.delete('/users/:id', authMiddleware, roleMiddleware('admin'), async (req,
     res.json({ message: 'User deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+  try {
+    const user = await get('SELECT id, role, email FROM users WHERE id = ?', [req.params.id]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.role === 'admin') return res.status(400).json({ error: 'Cannot reset an admin password' });
+    const provided = req.body && req.body.password ? String(req.body.password) : null;
+    if (provided && provided.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    const gen = () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+      let s = '';
+      for (let i = 0; i < 14; i++) s += chars[Math.floor(Math.random() * chars.length)];
+      return s;
+    };
+    const password = provided || gen();
+    const password_hash = await bcrypt.hash(password, 12);
+    await run('UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?', [password_hash, req.params.id]);
+    await createNotification(user.id, 'password_reset', 'Password reset', 'An administrator reset your password. Please log in with the new password provided to you.', {});
+    await adminAudit(req, 'password_reset', 'user', Number(req.params.id), `reset password for ${user.email}`);
+    res.json({ message: 'Password reset. The user will need to log in again.', password: provided ? undefined : password });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

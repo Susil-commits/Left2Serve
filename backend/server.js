@@ -13,6 +13,7 @@ import listingRoutes from './routes/listings.js';
 import reservationRoutes from './routes/reservations.js';
 import adminRoutes from './routes/admin.js';
 import notificationRoutes from './routes/notifications.js';
+import reviewRoutes from './routes/reviews.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api/listings', listingRoutes);
 app.use('/api/reservations', reservationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/reviews', reviewRoutes);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));

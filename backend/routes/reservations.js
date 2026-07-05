@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { get, all, run, insert } from '../db/database.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 import { createNotification } from '../db/notify.js';
+import { getAvailability, recomputeListingStatus } from '../db/availability.js';
 
 const router = Router();
 
@@ -16,11 +17,12 @@ router.post('/', authMiddleware, roleMiddleware('ngo', 'volunteer'), async (req,
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
     if (listing.status !== 'available') return res.status(400).json({ error: 'Listing is no longer available' });
     if (new Date(listing.expiry_date) <= new Date()) return res.status(400).json({ error: 'This listing has expired' });
-    if (qty > listing.quantity) return res.status(400).json({ error: `Quantity exceeds available ${listing.quantity} ${listing.unit}` });
+    const { remaining } = await getAvailability(food_listing_id);
+    if (qty > remaining) return res.status(400).json({ error: `Only ${remaining} ${listing.unit} available` });
     const [existing] = await all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('pending','approved')", [food_listing_id, req.user.id]);
     if (existing) return res.status(409).json({ error: 'You already have an active reservation for this listing' });
     const id = await insert('INSERT INTO reservations (food_listing_id, user_id, quantity, pickup_time, notes) VALUES (?, ?, ?, ?, ?)', [food_listing_id, req.user.id, qty, pickup_time || null, notes || null]);
-    await run("UPDATE food_listings SET status = 'reserved' WHERE id = ?", [food_listing_id]);
+    await recomputeListingStatus(food_listing_id);
     const reservation = await get('SELECT * FROM reservations WHERE id = ?', [id]);
     const reserver = await get('SELECT name FROM users WHERE id = ?', [req.user.id]);
     await createNotification(
@@ -64,8 +66,7 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   if (!allowed.has(status)) return res.status(400).json({ error: `Cannot set status to ${status}` });
   try {
     await run('UPDATE reservations SET status = ? WHERE id = ?', [status, req.params.id]);
-    if (status === 'collected') await run("UPDATE food_listings SET status = 'collected' WHERE id = ?", [reservation.food_listing_id]);
-    else if (status === 'cancelled') await run("UPDATE food_listings SET status = 'available' WHERE id = ?", [reservation.food_listing_id]);
+    await recomputeListingStatus(reservation.food_listing_id);
     const updated = await get('SELECT * FROM reservations WHERE id = ?', [req.params.id]);
     const info = await get('SELECT title, user_id FROM food_listings WHERE id = ?', [reservation.food_listing_id]);
     const title = info?.title;

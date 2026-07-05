@@ -3,6 +3,14 @@ import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { get, all, run, insert } from '../db/database.js';
 import { authMiddleware, roleMiddleware, optionalAuth } from '../middleware/auth.js';
+import { recomputeListingStatus, REMAINING_SQL } from '../db/availability.js';
+
+function withRemaining(l) {
+  const obj = { ...l, image_urls: l.image_urls || [] };
+  if (obj.remaining == null) obj.remaining = Number(l.quantity) || 0;
+  else obj.remaining = Number(obj.remaining);
+  return obj;
+}
 
 const router = Router();
 const CLOUDINARY_CONFIGURED = !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
@@ -38,7 +46,7 @@ router.get('/', async (req, res) => {
   const { category, status, search, sort } = req.query;
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.min(48, Math.max(1, parseInt(req.query.limit) || 12));
-  let query = `SELECT fl.*, u.name as donor_name, u.organization as donor_org FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE 1=1`;
+  let query = `SELECT fl.*, u.name as donor_name, u.organization as donor_org, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE 1=1`;
   let countQuery = `SELECT COUNT(*) as total FROM food_listings fl WHERE 1=1`;
   const params = [];
   const countParams = [];
@@ -61,14 +69,14 @@ router.get('/', async (req, res) => {
   const [listings, countRow] = await Promise.all([all(query, params), get(countQuery, countParams)]);
   const total = countRow ? countRow.total : 0;
   res.json({
-    listings: listings.map((l) => ({ ...l, image_urls: l.image_urls || [] })),
+    listings: listings.map(withRemaining),
     pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
   });
 });
 
 router.get('/mine', authMiddleware, async (req, res) => {
-  const listings = await all('SELECT * FROM food_listings WHERE user_id = ? ORDER BY created_at DESC', [req.user.id]);
-  res.json(listings.map(l => ({ ...l, image_urls: l.image_urls || [] })));
+  const listings = await all(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.user_id = ? ORDER BY fl.created_at DESC`, [req.user.id]);
+  res.json(listings.map(withRemaining));
 });
 
 router.get('/stats', async (req, res) => {
@@ -88,10 +96,32 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+router.get('/impact', async (req, res) => {
+  try {
+    const [mealsRow] = await all("SELECT COALESCE(SUM(quantity), 0) as total FROM reservations WHERE status = 'collected'");
+    const [listingsRow] = await all('SELECT COUNT(*) as count FROM food_listings');
+    const [donorsRow] = await all("SELECT COUNT(*) as count FROM users WHERE role = 'donor'");
+    const [receiversRow] = await all("SELECT COUNT(*) as count FROM users WHERE role IN ('ngo','volunteer')");
+    const meals = Number(mealsRow.total) || 0;
+    const co2Kg = Math.round(meals * 2.5);
+    res.json({
+      mealsSaved: meals,
+      co2Kg,
+      trees: Math.round((co2Kg / 21) * 10) / 10,
+      waterLiters: meals * 1250,
+      totalListings: listingsRow.count,
+      totalDonors: donorsRow.count,
+      totalReceivers: receiversRow.count,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch impact' });
+  }
+});
+
 router.get('/:id', optionalAuth, async (req, res) => {
-  const listing = await get(`SELECT fl.*, u.name as donor_name, u.organization as donor_org, u.phone as donor_phone FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE fl.id = ?`, [req.params.id]);
+  const listing = await get(`SELECT fl.*, u.name as donor_name, u.organization as donor_org, u.phone as donor_phone, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE fl.id = ?`, [req.params.id]);
   if (!listing) return res.status(404).json({ error: 'Listing not found' });
-  listing.image_urls = listing.image_urls || [];
+  const out = withRemaining(listing);
   const isOwner = req.user && req.user.id === listing.user_id;
   const isAdmin = req.user && req.user.role === 'admin';
   let canSeeDonorContact = isOwner || isAdmin;
@@ -99,8 +129,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
     const [r] = await all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('approved','collected')", [listing.id, req.user.id]);
     if (r) canSeeDonorContact = true;
   }
-  if (!canSeeDonorContact) delete listing.donor_phone;
-  res.json(listing);
+  if (!canSeeDonorContact) delete out.donor_phone;
+  res.json(out);
 });
 
 router.post('/', authMiddleware, roleMiddleware('donor'), async (req, res) => {
@@ -113,9 +143,8 @@ router.post('/', authMiddleware, roleMiddleware('donor'), async (req, res) => {
   try {
     const images = sanitizeImageUrls(image_urls);
     const id = await insert(`INSERT INTO food_listings (user_id, title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [req.user.id, String(title).trim(), description || null, category, qty, unit || 'servings', price || 0, expiry_date, String(pickup_address).trim(), pickup_instructions || null, images]);
-    const listing = await get('SELECT * FROM food_listings WHERE id = ?', [id]);
-    listing.image_urls = listing.image_urls || [];
-    res.status(201).json(listing);
+    const listing = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [id]);
+    res.status(201).json(withRemaining(listing));
   } catch (err) { res.status(500).json({ error: 'Failed to create listing' }); }
 });
 
@@ -133,9 +162,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const images = sanitizeImageUrls(image_urls ?? listing.image_urls);
     await run(`UPDATE food_listings SET title=?, description=?, category=?, quantity=?, unit=?, price=?, expiry_date=?, pickup_address=?, pickup_instructions=?, image_urls=?, status=? WHERE id=?`, [title ? String(title).trim() : listing.title, description ?? listing.description, nextCategory, nextQty, unit || listing.unit, price ?? listing.price, nextExpiry, pickup_address ? String(pickup_address).trim() : listing.pickup_address, pickup_instructions ?? listing.pickup_instructions, images, status || listing.status, req.params.id]);
-    const updated = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
-    updated.image_urls = updated.image_urls || [];
-    res.json(updated);
+    await recomputeListingStatus(req.params.id);
+    const updated = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [req.params.id]);
+    res.json(withRemaining(updated));
   } catch (err) { res.status(500).json({ error: 'Failed to update listing' }); }
 });
 
@@ -149,6 +178,19 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     await run('DELETE FROM food_listings WHERE id = ?', [req.params.id]);
     res.json({ message: 'Listing deleted' });
   } catch (err) { res.status(500).json({ error: 'Failed to delete listing' }); }
+});
+
+router.post('/:id/close', authMiddleware, async (req, res) => {
+  const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
+  if (!listing) return res.status(404).json({ error: 'Listing not found' });
+  if (listing.user_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
+  if (['collected', 'expired', 'cancelled'].includes(listing.status)) return res.status(400).json({ error: 'Listing is already closed' });
+  const [active] = await all("SELECT COUNT(*) as count FROM reservations WHERE food_listing_id = ? AND status IN ('pending','approved')", [req.params.id]);
+  if (active.count > 0) return res.status(409).json({ error: 'Cannot close a listing with pending or approved reservations' });
+  try {
+    await run("UPDATE food_listings SET status = 'collected' WHERE id = ?", [req.params.id]);
+    res.json({ message: 'Listing marked as donated' });
+  } catch (err) { res.status(500).json({ error: 'Failed to close listing' }); }
 });
 
 export default router;

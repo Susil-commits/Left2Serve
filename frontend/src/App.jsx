@@ -16,6 +16,7 @@ import EditFood from './pages/EditFood';
 import BrowseFood from './pages/BrowseFood';
 import FoodDetail from './pages/FoodDetail';
 import SavedListings from './pages/SavedListings';
+import Impact from './pages/Impact';
 import AdminDashboard from './pages/AdminDashboard';
 import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
@@ -38,6 +39,7 @@ export default function App() {
                   <Route path="/browse" element={<BrowseFood />} />
                   <Route path="/food/:id" element={<FoodDetail />} />
                   <Route path="/saved" element={<SavedListings />} />
+                  <Route path="/impact" element={<Impact />} />
                   <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="/list-food" element={<ProtectedRoute roles={['donor']}><ListFood /></ProtectedRoute>} />

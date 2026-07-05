@@ -116,12 +116,16 @@ Access is enforced on **both** the API (authoritative) and the UI (route guards 
 ### Core Features
 - Food listing with image uploads (Cloudinary)
 - Real-time listing status (available → reserved → collected)
+- **Partial-quantity reservations** — a single large listing can serve multiple receivers; the listing stays available until its quantity is fully claimed, with a live "X available" count
 - Order tracking with visual step indicators
 - Role-based dashboards with statistics
 - In-app notifications with unread badge (reservation lifecycle events)
 - Automatic expiry sweep — expired listings are hidden and marked expired
 - Server-side search, filtering, sorting, and pagination on listings
-- Admin panel with full CRUD oversight, user management (role change, suspend, delete), and activity trends
+- **Reviews & ratings** — after a completed pickup, donors and receivers rate each other (1–5 stars + comment); average ratings appear on listings and profiles
+- **Impact tracking** — global impact report (`/impact`) and per-user impact (meals saved, CO₂e avoided, water saved, tree-years) on the profile
+- **Donor self-close** — record an offline/self-handled donation by marking an available listing as donated
+- Admin panel with full CRUD oversight, user management (role change, suspend, delete, **password reset**), listing moderation (**delete**), and activity trends
 - Responsive design with premium UI
 
 ## API Endpoints
@@ -143,9 +147,10 @@ Access is enforced on **both** the API (authoritative) and the UI (route guards 
 | POST | `/api/listings` | JWT (donor) |
 | PUT | `/api/listings/:id` | JWT (owner) |
 | DELETE | `/api/listings/:id` | JWT (owner) |
+| POST | `/api/listings/:id/close` | JWT (owner) |
 | POST | `/api/listings/upload` | JWT |
 
-`GET /api/listings` supports server-side filtering, sorting, and pagination via query params: `category`, `search`, `sort` (`newest` \| `expiring` \| `quantity`), `page`, `limit`. It returns `{ listings, pagination: { page, limit, total, totalPages } }`. Available listings whose expiry has passed are automatically excluded and swept to `expired` status by a background job.
+`GET /api/listings` supports server-side filtering, sorting, and pagination via query params: `category`, `search`, `sort` (`newest` \| `expiring` \| `quantity`), `page`, `limit`. It returns `{ listings, pagination: { page, limit, total, totalPages } }`. Available listings whose expiry has passed are automatically excluded and swept to `expired` status by a background job. Each listing includes a `remaining` field (quantity not yet claimed) so partial reservations are supported — a listing stays `available` until `remaining` reaches 0.
 
 ### Reservations
 | Method | Endpoint | Auth |
@@ -164,6 +169,21 @@ Access is enforced on **both** the API (authoritative) and the UI (route guards 
 | PATCH | `/api/notifications/read-all` | JWT |
 | DELETE | `/api/notifications/:id` | JWT |
 
+### Reviews
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| POST | `/api/reviews` | JWT |
+| GET | `/api/reviews/reservation/:id` | JWT |
+| GET | `/api/reviews/user/:userId` | No |
+
+Reviews are 1–5 star ratings (with an optional comment) that donors and receivers leave for each other once a reservation is `collected`. One review per party per reservation; the reviewee is determined server-side from the reservation. `GET /api/reviews/user/:userId` returns `{ average, count, reviews }`.
+
+### Impact
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| GET | `/api/listings/impact` | No |
+| GET | `/api/auth/impact` | JWT |
+
 Notifications are generated automatically on reservation events (new request, approval, collection, cancellation) for both donors and receivers, including admin-driven order updates.
 
 ### Admin
@@ -173,10 +193,12 @@ Notifications are generated automatically on reservation events (new request, ap
 | GET | `/api/admin/stats` | JWT (admin) |
 | GET | `/api/admin/users` | JWT (admin) |
 | PATCH | `/api/admin/users/:id` | JWT (admin) |
+| PATCH | `/api/admin/users/:id/password` | JWT (admin) |
 | DELETE | `/api/admin/users/:id` | JWT (admin) |
 | GET | `/api/admin/ngos` | JWT (admin) |
 | GET | `/api/admin/orders` | JWT (admin) |
 | GET | `/api/admin/listings` | JWT (admin) |
+| DELETE | `/api/admin/listings/:id` | JWT (admin) |
 | GET | `/api/admin/trends` | JWT (admin) |
 | GET | `/api/admin/audit-log` | JWT (admin) |
 | PATCH | `/api/admin/orders/:id` | JWT (admin) |

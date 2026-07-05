@@ -25,6 +25,7 @@ export const api = {
     register: (body) => request('/auth/register', { method: 'POST', body }),
     login: (body) => request('/auth/login', { method: 'POST', body }),
     me: () => request('/auth/me'),
+    impact: () => request('/auth/impact'),
     updateProfile: (body) => request('/auth/profile', { method: 'PUT', body }),
     changePassword: (body) => request('/auth/password', { method: 'PUT', body }),
   },
@@ -33,9 +34,11 @@ export const api = {
     getMine: () => request('/listings/mine'),
     getOne: (id) => request(`/listings/${id}`),
     getStats: () => request('/listings/stats'),
+    getImpact: () => request('/listings/impact'),
     create: (body) => request('/listings', { method: 'POST', body }),
     update: (id, body) => request(`/listings/${id}`, { method: 'PUT', body }),
     delete: (id) => request(`/listings/${id}`, { method: 'DELETE' }),
+    close: (id) => request(`/listings/${id}/close`, { method: 'POST' }),
     upload: (formData) => request('/listings/upload', { method: 'POST', body: formData }),
   },
   reservations: {
@@ -43,6 +46,11 @@ export const api = {
     getMine: () => request('/reservations'),
     getForListing: (listingId) => request(`/reservations/listing/${listingId}`),
     update: (id, body) => request(`/reservations/${id}`, { method: 'PATCH', body }),
+  },
+  reviews: {
+    create: (body) => request('/reviews', { method: 'POST', body }),
+    forReservation: (id) => request(`/reviews/reservation/${id}`),
+    forUser: (userId) => request(`/reviews/user/${userId}`),
   },
   notifications: {
     list: () => request('/notifications'),
@@ -58,10 +66,12 @@ export const api = {
     ngos: () => request('/admin/ngos'),
     orders: () => request('/admin/orders'),
     listings: () => request('/admin/listings'),
+    deleteListing: (id) => request(`/admin/listings/${id}`, { method: 'DELETE' }),
     trends: (days = 14) => request(`/admin/trends?days=${days}`),
     auditLog: (limit = 50) => request(`/admin/audit-log?limit=${limit}`),
     updateOrder: (id, body) => request(`/admin/orders/${id}`, { method: 'PATCH', body }),
     updateUser: (id, body) => request(`/admin/users/${id}`, { method: 'PATCH', body }),
+    resetUserPassword: (id, body) => request(`/admin/users/${id}/password`, { method: 'PATCH', body }),
     deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
   }
 };

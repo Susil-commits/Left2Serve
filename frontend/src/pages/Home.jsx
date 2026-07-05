@@ -167,7 +167,8 @@ export default function Home() {
 
       <section className="py-24 bg-accent/[0.015]">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16 reveal"><span className="section-badge">Our Impact</span><h2 className="section-title mb-4">Making a Real <span className="gradient-text-static">Difference</span></h2><p className="section-subtitle mx-auto">Every meal shared creates a ripple effect of positive change in communities.</p></div>
+          <div className="text-center mb-12 reveal"><span className="section-badge">Our Impact</span><h2 className="section-title mb-4">Making a Real <span className="gradient-text-static">Difference</span></h2><p className="section-subtitle mx-auto">Every meal shared creates a ripple effect of positive change in communities.</p></div>
+          <div className="text-center mb-10 reveal"><Link to="/impact" className="btn-outline">See full impact report →</Link></div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {[
               { value: stats.mealsSaved, label: 'Meals Saved', icon: '🍽️', desc: 'Redirected from waste to plates' },

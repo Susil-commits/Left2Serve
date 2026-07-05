@@ -4,6 +4,8 @@ import { useAuth } from '../components/AuthContext';
 import { api } from '../api';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmDialog';
+import StarRating from '../components/StarRating';
+import ReviewModal from '../components/ReviewModal';
 
 const statusConfig = {
   available: { cls: 'badge-green', dot: 'bg-emerald-500', label: 'Available' },
@@ -31,6 +33,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   const [expandedListing, setExpandedListing] = useState(null);
+  const [reviewState, setReviewState] = useState({});
+  const [reviewModal, setReviewModal] = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -55,6 +59,18 @@ export default function Dashboard() {
   }, [user.role, addToast]);
 
   useEffect(() => {
+    if (user.role !== 'ngo' && user.role !== 'volunteer') return;
+    (async () => {
+      const collected = myReservations.filter((r) => r.status === 'collected');
+      const map = {};
+      await Promise.all(collected.map(async (r) => {
+        try { map[r.id] = await api.reviews.forReservation(r.id); } catch { map[r.id] = { canReview: false, myReview: null }; }
+      }));
+      setReviewState(map);
+    })();
+  }, [myReservations, user.role]);
+
+  useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
@@ -68,6 +84,20 @@ export default function Dashboard() {
     try {
       await api.reservations.update(id, { status: action });
       addToast(`Reservation ${action}`, 'success');
+      await loadData();
+    } catch (err) {
+      addToast(err.message, 'error');
+    }
+    setActionLoading(null);
+  };
+
+  const handleCloseListing = async (l) => {
+    const ok = await confirm({ title: 'Mark as donated?', message: 'This records the listing as donated/collected without a reservation (e.g. self-handled). This cannot be undone.', confirmLabel: 'Mark Donated', variant: 'danger' });
+    if (!ok) return;
+    setActionLoading(`close-${l.id}`);
+    try {
+      await api.listings.close(l.id);
+      addToast('Listing marked as donated', 'success');
       await loadData();
     } catch (err) {
       addToast(err.message, 'error');
@@ -147,14 +177,25 @@ export default function Dashboard() {
                     <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 group">
                       <div className="min-w-0 flex-1">
                         <Link to={`/food/${l.id}`} className="font-semibold text-text group-hover:text-accent transition-colors truncate block">{l.title}</Link>
-                        <div className="text-subtle text-sm mt-1">{l.quantity} {l.unit} · {l.category}</div>
+                        <div className="text-subtle text-sm mt-1">
+                          {l.quantity} {l.unit} · {l.category}
+                          {l.status === 'available' && l.remaining != null && l.remaining < l.quantity && (
+                            <span className="text-emerald-600 font-semibold"> · {l.remaining} left</span>
+                          )}
+                        </div>
                         <div className="text-xs text-muted mt-1">Expires: {new Date(l.expiry_date).toLocaleDateString()}</div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                         <span className={`badge ${statusConfig[l.status]?.cls || 'badge-gray'} text-[10px]`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${statusConfig[l.status]?.dot || 'bg-gray-400'}`} />{statusConfig[l.status]?.label || l.status}
                         </span>
                         <Link to={`/edit-food/${l.id}`} className="px-3 py-1.5 bg-gray-100 text-subtle text-xs font-semibold rounded-lg hover:bg-accent/10 hover:text-accent transition-colors">Edit</Link>
+                        {l.status === 'available' && (
+                          <button onClick={() => handleCloseListing(l)} disabled={actionLoading === `close-${l.id}`}
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50">
+                            {actionLoading === `close-${l.id}` ? '...' : 'Mark Donated'}
+                          </button>
+                        )}
                         {l.status === 'reserved' && reservations.length > 0 && (
                           <button onClick={() => setExpandedListing(isExpanded ? null : l.id)}
                             className="px-3 py-1.5 bg-accent/5 text-accent text-xs font-semibold rounded-lg hover:bg-accent/10 transition-colors">
@@ -266,6 +307,15 @@ export default function Dashboard() {
                           {actionLoading === r.id ? '...' : 'Cancel'}
                         </button>
                       )}
+                      {r.status === 'collected' && reviewState[r.id]?.canReview && (
+                        <button onClick={() => setReviewModal({ reservationId: r.id, revieweeName: r.donor_name, foodTitle: r.food_title })}
+                          className="flex-1 py-1.5 bg-amber-50 text-amber-700 text-xs font-semibold rounded-lg hover:bg-amber-100 transition-colors">
+                          Rate
+                        </button>
+                      )}
+                      {r.status === 'collected' && reviewState[r.id]?.myReview && (
+                        <div className="flex-1"><StarRating value={reviewState[r.id].myReview.rating} size="sm" showValue /></div>
+                      )}
                     </div>
                   </div>
                 );
@@ -274,6 +324,15 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
+      <ReviewModal
+        open={!!reviewModal}
+        onClose={() => setReviewModal(null)}
+        reservationId={reviewModal?.reservationId}
+        revieweeName={reviewModal?.revieweeName}
+        foodTitle={reviewModal?.foodTitle}
+        onSubmitted={loadData}
+      />
     </div>
   );
 }
