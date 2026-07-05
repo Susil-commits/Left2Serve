@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import Lightbox from '../components/Lightbox';
 import StarRating from '../components/StarRating';
+import { openRazorpayCheckout } from '../utils/razorpay';
 
 const categoryLabels = { event: 'Event', restaurant: 'Restaurant', hotel: 'Hotel', caterer: 'Caterer', household: 'Household' };
 const categoryIcons = { event: '🎉', restaurant: '🍽️', hotel: '🏨', caterer: '🍱', household: '🏠' };
@@ -29,6 +30,7 @@ export default function FoodDetail() {
   const [quantity, setQuantity] = useState(1);
   const [pickupTime, setPickupTime] = useState('');
   const [notes, setNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cod');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [activeImage, setActiveImage] = useState(0);
@@ -57,9 +59,25 @@ export default function FoodDetail() {
     setReserving(true);
     setError('');
     try {
-      await api.reservations.create({ food_listing_id: listing.id, quantity: parseInt(quantity), pickup_time: pickupTime || null, notes: notes || null });
-      setMessage('Reservation confirmed!');
-      addToast('Food reserved successfully', 'success');
+      const price = Number(listing.price) || 0;
+      const isPaid = price > 0;
+      if (isPaid && paymentMethod === 'razorpay') {
+        const order = await api.payments.createOrder({ food_listing_id: listing.id, quantity: parseInt(quantity), pickup_time: pickupTime || null, notes: notes || null });
+        const paid = await openRazorpayCheckout(order, user);
+        if (!paid) {
+          try { await api.reservations.update(order.reservation_id, { status: 'cancelled' }); } catch { /* best-effort release */ }
+          addToast('Payment cancelled. Your reservation was released.', 'error');
+          await loadListing();
+          return;
+        }
+        const result = await api.payments.verify({ reservation_id: order.reservation_id, razorpay_order_id: order.razorpay_order_id, razorpay_payment_id: paid.razorpay_payment_id, razorpay_signature: paid.razorpay_signature });
+        setMessage(result.success ? 'Payment successful! Reservation confirmed.' : 'Reservation confirmed!');
+        addToast('Payment successful & food reserved', 'success');
+      } else {
+        await api.reservations.create({ food_listing_id: listing.id, quantity: parseInt(quantity), pickup_time: pickupTime || null, notes: notes || null, payment_method: isPaid ? paymentMethod : undefined });
+        setMessage('Reservation confirmed!');
+        addToast('Food reserved successfully', 'success');
+      }
       await loadListing();
     } catch (err) {
       setError(err.message);
@@ -116,6 +134,9 @@ export default function FoodDetail() {
   const canReserve = user && (user.role === 'ngo' || user.role === 'volunteer') && listing.status === 'available' && remaining > 0;
   const status = statusConfig[listing.status] || statusConfig.available;
   const isExpired = new Date(listing.expiry_date) < new Date();
+  const price = Number(listing.price) || 0;
+  const isPaid = price > 0;
+  const total = Math.round(price * (parseInt(quantity) || 1) * 100) / 100;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 page-transition">
@@ -261,8 +282,35 @@ export default function FoodDetail() {
                 <label className="block text-sm font-semibold text-text mb-2">Notes (optional)</label>
                 <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="input-field" placeholder="Any special instructions for pickup..." />
               </div>
+              {isPaid && (
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-text mb-2">Payment Method</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => setPaymentMethod('cod')}
+                      className={`text-left p-4 rounded-2xl border-2 transition-all ${paymentMethod === 'cod' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base">💵</span>
+                        <span className="text-sm font-bold text-text">Cash on Delivery</span>
+                      </div>
+                      <p className="text-xs text-muted">Pay in cash at pickup</p>
+                    </button>
+                    <button type="button" onClick={() => setPaymentMethod('razorpay')}
+                      className={`text-left p-4 rounded-2xl border-2 transition-all ${paymentMethod === 'razorpay' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base">💳</span>
+                        <span className="text-sm font-bold text-text">Pay Online</span>
+                      </div>
+                      <p className="text-xs text-muted">UPI / Cards / Netbanking</p>
+                    </button>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-border">
+                    <span className="text-sm font-semibold text-subtle">Total payable</span>
+                    <span className="text-lg font-black text-text">₹{total.toFixed(2)}{paymentMethod === 'cod' && <span className="text-xs font-medium text-muted ml-1">at pickup</span>}</span>
+                  </div>
+                </div>
+              )}
               <button type="submit" disabled={reserving} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect">
-                {reserving ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Reserving...</span> : 'Confirm Reservation'}
+                {reserving ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing...</span> : (isPaid && paymentMethod === 'razorpay' ? `Pay ₹${total.toFixed(2)} & Reserve` : 'Confirm Reservation')}
               </button>
             </form>
           )}

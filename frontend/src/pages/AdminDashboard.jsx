@@ -17,6 +17,13 @@ const statusConfig = {
   approved: { cls: 'badge-green', dot: 'bg-emerald-400' },
 };
 
+function paymentCell(o) {
+  if (!o || !o.payment_method || o.payment_method === 'none') return { cls: 'badge-gray', label: 'Free', sub: '' };
+  if (o.payment_method === 'razorpay') return { cls: 'badge-purple', label: 'Razorpay', sub: o.payment_status };
+  if (o.payment_method === 'cod') return { cls: 'badge-blue', label: 'COD', sub: o.payment_status };
+  return { cls: 'badge-gray', label: o.payment_method, sub: '' };
+}
+
 export default function AdminDashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -451,6 +458,7 @@ export default function AdminDashboard() {
                           <th className="text-left py-3 px-4 text-xs font-semibold text-subtle uppercase tracking-wider">Donor</th>
                           <th className="text-left py-3 px-4 text-xs font-semibold text-subtle uppercase tracking-wider">Qty</th>
                           <th className="text-left py-3 px-4 text-xs font-semibold text-subtle uppercase tracking-wider">Status</th>
+                          <th className="text-left py-3 px-4 text-xs font-semibold text-subtle uppercase tracking-wider">Payment</th>
                           <th className="text-left py-3 px-4 text-xs font-semibold text-subtle uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
@@ -472,6 +480,11 @@ export default function AdminDashboard() {
                               <span className={`badge ${statusConfig[o.status]?.cls || 'badge-gray'} text-[10px]`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${statusConfig[o.status]?.dot || 'bg-gray-400'}`} />{o.status}
                               </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className={`badge ${paymentCell(o).cls} text-[10px]`}>{paymentCell(o).label}</span>
+                              {paymentCell(o).sub && <div className="text-[10px] text-muted mt-1 capitalize">{paymentCell(o).sub}</div>}
+                              {Number(o.amount) > 0 && <div className="text-[10px] font-semibold text-text mt-0.5">₹{Number(o.amount).toFixed(2)}</div>}
                             </td>
                             <td className="py-3 px-4">
                               <div className="flex gap-1.5">
@@ -497,7 +510,7 @@ export default function AdminDashboard() {
                             </td>
                           </tr>
                         ))}
-                        {filteredOrders.length === 0 && <tr><td colSpan={7} className="text-subtle text-sm text-center py-12">No orders found</td></tr>}
+                        {filteredOrders.length === 0 && <tr><td colSpan={8} className="text-subtle text-sm text-center py-12">No orders found</td></tr>}
                       </tbody>
                     </table>
                   </div>

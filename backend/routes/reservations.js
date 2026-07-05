@@ -7,7 +7,7 @@ import { getAvailability, recomputeListingStatus } from '../db/availability.js';
 const router = Router();
 
 router.post('/', authMiddleware, roleMiddleware('ngo', 'volunteer'), async (req, res) => {
-  const { food_listing_id, quantity, pickup_time, notes } = req.body;
+  const { food_listing_id, quantity, pickup_time, notes, payment_method } = req.body;
   if (!food_listing_id || !quantity) return res.status(400).json({ error: 'food_listing_id and quantity are required' });
   const qty = Number(quantity);
   if (!Number.isFinite(qty) || qty < 1) return res.status(400).json({ error: 'Quantity must be at least 1' });
@@ -21,7 +21,18 @@ router.post('/', authMiddleware, roleMiddleware('ngo', 'volunteer'), async (req,
     if (qty > remaining) return res.status(400).json({ error: `Only ${remaining} ${listing.unit} available` });
     const [existing] = await all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('pending','approved')", [food_listing_id, req.user.id]);
     if (existing) return res.status(409).json({ error: 'You already have an active reservation for this listing' });
-    const id = await insert('INSERT INTO reservations (food_listing_id, user_id, quantity, pickup_time, notes) VALUES (?, ?, ?, ?, ?)', [food_listing_id, req.user.id, qty, pickup_time || null, notes || null]);
+
+    const price = Number(listing.price) || 0;
+    const amount = Math.round(price * qty * 100) / 100;
+    let method = 'none';
+    let paymentStatus = 'paid';
+    if (amount > 0) {
+      if (payment_method === 'razorpay') return res.status(400).json({ error: 'Use the payment endpoint for Razorpay' });
+      method = 'cod';
+      paymentStatus = 'pending';
+    }
+
+    const id = await insert('INSERT INTO reservations (food_listing_id, user_id, quantity, pickup_time, notes, payment_method, payment_status, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [food_listing_id, req.user.id, qty, pickup_time || null, notes || null, method, paymentStatus, amount]);
     await recomputeListingStatus(food_listing_id);
     const reservation = await get('SELECT * FROM reservations WHERE id = ?', [id]);
     const reserver = await get('SELECT name FROM users WHERE id = ?', [req.user.id]);

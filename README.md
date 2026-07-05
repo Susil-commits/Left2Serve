@@ -68,6 +68,8 @@ The frontend dev server proxies `/api` requests to `http://localhost:5000`.
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
 | `CLOUDINARY_API_KEY` | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret |
+| `RAZORPAY_KEY_ID` | Razorpay key ID (test keys start with `rzp_test_`) |
+| `RAZORPAY_KEY_SECRET` | Razorpay key secret |
 
 ## Features
 
@@ -160,6 +162,17 @@ Access is enforced on **both** the API (authoritative) and the UI (route guards 
 | GET | `/api/reservations/listing/:id` | JWT |
 | PATCH | `/api/reservations/:id` | JWT |
 
+Each reservation stores a `payment_method` (`none` for free listings, `cod`, or `razorpay`) and a `payment_status` (`pending` / `paid` / `failed`). For paid listings the reserver chooses between **Cash on Delivery** (paid at pickup) and **Razorpay** (paid online at reservation time).
+
+### Payments
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| POST | `/api/payments/config` | No |
+| POST | `/api/payments/create-order` | JWT (ngo/volunteer) |
+| POST | `/api/payments/verify` | JWT (ngo/volunteer) |
+
+`create-order` creates a Razorpay order and a `pending` reservation (holding the quantity), returning the `razorpay_order_id` + amount for the checkout. After the client completes the Razorpay checkout it calls `verify`, which checks the HMAC signature server-side and flips `payment_status` to `paid`.
+
 ### Notifications
 | Method | Endpoint | Auth |
 |--------|----------|------|
@@ -234,6 +247,8 @@ Notifications are generated automatically on reservation events (new request, ap
 | `ADMIN_CODE` | — | ✅ | Admin login code |
 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | — | ✅ | MySQL connection |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | — | ✅ | Image uploads (server returns 503 if not set) |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | — | ✅ | Online payments via Razorpay (COD still works if unset) |
+| `VITE_RAZORPAY_KEY_ID` | ✅ | — | Razorpay public key for the checkout |
 
 ## License
 

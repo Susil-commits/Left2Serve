@@ -47,6 +47,11 @@ export const api = {
     getForListing: (listingId) => request(`/reservations/listing/${listingId}`),
     update: (id, body) => request(`/reservations/${id}`, { method: 'PATCH', body }),
   },
+  payments: {
+    config: () => request('/payments/config', { method: 'POST' }),
+    createOrder: (body) => request('/payments/create-order', { method: 'POST', body }),
+    verify: (body) => request('/payments/verify', { method: 'POST', body }),
+  },
   reviews: {
     create: (body) => request('/reviews', { method: 'POST', body }),
     forReservation: (id) => request(`/reviews/reservation/${id}`),

@@ -23,6 +23,21 @@ const orderSteps = [
   { key: 'collected', label: 'Collected', icon: '📦' },
 ];
 
+function paymentMeta(r) {
+  if (!r || !r.payment_method || r.payment_method === 'none') return null;
+  if (r.payment_method === 'razorpay') {
+    const status = r.payment_status === 'paid' ? 'Paid' : r.payment_status === 'failed' ? 'Failed' : 'Payment pending';
+    const statusCls = r.payment_status === 'paid' ? 'text-emerald-600' : r.payment_status === 'failed' ? 'text-red-500' : 'text-amber-600';
+    return { cls: 'badge-purple', label: 'Razorpay', status, statusCls };
+  }
+  if (r.payment_method === 'cod') {
+    const status = r.payment_status === 'paid' ? 'Paid' : 'Pay at pickup';
+    const statusCls = r.payment_status === 'paid' ? 'text-emerald-600' : 'text-muted';
+    return { cls: 'badge-blue', label: 'COD', status, statusCls };
+  }
+  return null;
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { addToast } = useToast();
@@ -213,7 +228,16 @@ export default function Dashboard() {
                               <div className="min-w-0">
                                 <div className="text-sm font-semibold text-text">{r.reserver_name}</div>
                                 <div className="text-xs text-subtle">{r.reserver_org || 'No organization'} · {r.reserver_phone || 'No phone'}</div>
-                                <div className="text-xs text-muted mt-1">Qty: {r.quantity} · {new Date(r.created_at).toLocaleDateString()}</div>
+                                <div className="text-xs text-muted mt-1 flex items-center gap-2 flex-wrap">
+                                  <span>Qty: {r.quantity} · {new Date(r.created_at).toLocaleDateString()}</span>
+                                  {paymentMeta(r) && (
+                                    <>
+                                      <span className={`badge ${paymentMeta(r).cls} text-[10px]`}>{paymentMeta(r).label}</span>
+                                      <span className={`text-[10px] font-semibold ${paymentMeta(r).statusCls}`}>{paymentMeta(r).status}</span>
+                                      {Number(r.amount) > 0 && <span className="text-[10px] text-muted font-semibold">₹{Number(r.amount).toFixed(2)}</span>}
+                                    </>
+                                  )}
+                                </div>
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <span className={`badge ${statusConfig[r.status]?.cls || 'badge-gray'} text-[10px]`}>
@@ -273,6 +297,13 @@ export default function Dashboard() {
                     </div>
                     <Link to={`/food/${r.food_listing_id}`} className="font-semibold text-text text-sm truncate block group-hover:text-accent transition-colors mb-2">{r.food_title}</Link>
                     <div className="text-subtle text-xs mb-3">{r.quantity} servings · {r.pickup_address?.substring(0, 25)}...</div>
+                    {paymentMeta(r) && (
+                      <div className="flex items-center gap-2 mb-3 flex-wrap">
+                        <span className={`badge ${paymentMeta(r).cls} text-[10px]`}>{paymentMeta(r).label}</span>
+                        <span className={`text-[10px] font-semibold ${paymentMeta(r).statusCls}`}>{paymentMeta(r).status}</span>
+                        {Number(r.amount) > 0 && <span className="text-[10px] text-muted font-semibold ml-auto">₹{Number(r.amount).toFixed(2)}</span>}
+                      </div>
+                    )}
                     {(r.status === 'approved' || r.status === 'collected') && r.donor_phone && (
                       <div className="mb-3 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
                         <svg className="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
