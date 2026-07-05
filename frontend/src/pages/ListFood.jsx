@@ -22,6 +22,7 @@ export default function ListFood() {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+  const [nowLocal] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -72,7 +73,7 @@ export default function ListFood() {
               <label className="block text-sm font-semibold text-text mb-2">Category <span className="text-accent">*</span></label>
               <div className="grid grid-cols-2 gap-2">
                 {categories.map(c => (
-                  <button type="button" key={c.value} onClick={() => setForm({ ...form, category: c.value })}
+                  <button type="button" key={c.value} onClick={() => setForm({ ...form, category: c.value })} aria-pressed={form.category === c.value}
                     className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
                       form.category === c.value ? 'bg-accent/5 border-accent/30 text-accent' : 'bg-white border-border text-subtle hover:border-accent/20'
                     }`}>
@@ -103,7 +104,7 @@ export default function ListFood() {
           </div>
           <div>
             <label className="block text-sm font-semibold text-text mb-2">Expiry Date <span className="text-accent">*</span></label>
-            <input type="datetime-local" value={form.expiry_date} onChange={update('expiry_date')} required className="input-field" />
+            <input type="datetime-local" value={form.expiry_date} onChange={update('expiry_date')} min={nowLocal} required className="input-field" />
           </div>
         </div>
 
@@ -128,9 +129,12 @@ export default function ListFood() {
           <ImageUpload images={form.image_urls} onUpload={(urls) => setForm({ ...form, image_urls: urls })} onRemove={(i) => setForm({ ...form, image_urls: form.image_urls.filter((_, idx) => idx !== i) })} />
         </div>
 
-        <button type="submit" disabled={loading || !isFormValid} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none">
-          {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Publishing...</span> : 'Publish Listing'}
-        </button>
+        <div className="flex gap-3">
+          <button type="button" onClick={() => navigate(-1)} className="btn-outline flex-1 !py-3 !rounded-2xl">Cancel</button>
+          <button type="submit" disabled={loading || !isFormValid} className="btn-primary flex-1 !py-3 !rounded-2xl text-base ripple-effect disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none">
+            {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Publishing...</span> : 'Publish Listing'}
+          </button>
+        </div>
       </form>
     </div>
   );

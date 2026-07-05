@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import FoodCard from '../components/FoodCard';
+import Pagination from '../components/Pagination';
 
 const categories = [
   { value: '', label: 'All', icon: '🌟' },
@@ -17,13 +19,19 @@ const sortOptions = [
   { value: 'quantity', label: 'Most Quantity' },
 ];
 
+const LIMIT = 12;
+
 export default function BrowseFood() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [listings, setListings] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState('');
+  const [error, setError] = useState('');
+  const [category, setCategory] = useState(searchParams.get('category') || '');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -32,25 +40,39 @@ export default function BrowseFood() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
-      setListings(await api.listings.getAll({ category: category || undefined, search: debouncedSearch || undefined }));
+      const data = await api.listings.getAll({
+        category: category || undefined,
+        search: debouncedSearch || undefined,
+        sort,
+        page,
+        limit: LIMIT,
+      });
+      setListings(data.listings);
+      setPagination(data.pagination);
     } catch (err) {
-      console.error(err);
+      setError(err.message || 'Failed to load listings');
       setListings([]);
     }
     setLoading(false);
-  }, [category, debouncedSearch]);
+  }, [category, debouncedSearch, sort, page]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
 
-  const sorted = [...listings].sort((a, b) => {
-    if (sort === 'expiring') return new Date(a.expiry_date) - new Date(b.expiry_date);
-    if (sort === 'quantity') return b.quantity - a.quantity;
-    return new Date(b.created_at) - new Date(a.created_at);
-  });
+  const changeCategory = (value) => { setCategory(value); setPage(1); };
+  const changeSort = (value) => { setSort(value); setPage(1); };
+  const clearSearch = () => { setSearch(''); setPage(1); };
+  const changePage = (p) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (category) next.set('category', category); else next.delete('category');
+    setSearchParams(next, { replace: true });
+  }, [category, searchParams, setSearchParams]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-transition">
@@ -64,19 +86,19 @@ export default function BrowseFood() {
           <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by title or description..." className="input-field pl-14" />
           {search && (
-            <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-accent transition-colors">
+            <button onClick={clearSearch} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-accent transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           )}
         </div>
-        <select value={sort} onChange={e => setSort(e.target.value)} className="input-field select-field !w-auto !py-2 !px-4 !text-sm">
+        <select value={sort} onChange={e => changeSort(e.target.value)} className="input-field select-field !w-auto !py-2 !px-4 !text-sm">
           {sortOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       </div>
 
       <div className="flex gap-2 flex-wrap mb-8 animate-fade-in-up">
         {categories.map(c => (
-          <button key={c.value} onClick={() => setCategory(c.value)}
+          <button key={c.value} onClick={() => changeCategory(c.value)}
             className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 ${
               category === c.value ? 'bg-accent text-white shadow-red scale-105' : 'bg-gray-50 text-subtle hover:bg-gray-100 hover:text-text border border-border hover:border-accent/20'
             }`}>
@@ -85,7 +107,14 @@ export default function BrowseFood() {
         ))}
       </div>
 
-      {loading ? (
+      {error ? (
+        <div className="premium-card p-16 text-center animate-scale-in">
+          <div className="text-6xl mb-6 opacity-20">⚠️</div>
+          <p className="text-subtle text-lg mb-2 font-medium">Couldn't load listings</p>
+          <p className="text-muted text-sm mb-6">{error}</p>
+          <button onClick={loadData} className="btn-outline !py-2 !px-4 !text-sm !rounded-xl">Try Again</button>
+        </div>
+      ) : loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {[1,2,3,4,5,6,7,8].map(i => (
             <div key={i} className="rounded-2xl overflow-hidden animate-scale-in" style={{ animationDelay: `${i * 0.05}s` }}>
@@ -98,19 +127,20 @@ export default function BrowseFood() {
             </div>
           ))}
         </div>
-      ) : sorted.length === 0 ? (
+      ) : listings.length === 0 ? (
         <div className="premium-card p-16 text-center animate-scale-in">
           <div className="text-6xl mb-6 opacity-20">🍽️</div>
           <p className="text-subtle text-lg mb-2 font-medium">No food listings found</p>
           <p className="text-muted text-sm mb-6">{search ? 'Try a different search term' : 'Try a different category or check back later'}</p>
-          {search && <button onClick={() => setSearch('')} className="btn-outline !py-2 !px-4 !text-sm !rounded-xl">Clear Search</button>}
+          {search && <button onClick={clearSearch} className="btn-outline !py-2 !px-4 !text-sm !rounded-xl">Clear Search</button>}
         </div>
       ) : (
         <>
-          <div className="text-xs text-muted mb-4 font-medium">{sorted.length} listing{sorted.length !== 1 ? 's' : ''} found</div>
+          <div className="text-xs text-muted mb-4 font-medium">{pagination.total} listing{pagination.total !== 1 ? 's' : ''} found{pagination.totalPages > 1 && ` · Page ${pagination.page} of ${pagination.totalPages}`}</div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {sorted.map(l => <FoodCard key={l.id} listing={l} />)}
+            {listings.map(l => <FoodCard key={l.id} listing={l} />)}
           </div>
+          <Pagination page={pagination.page} pageCount={pagination.totalPages} onChange={changePage} />
         </>
       )}
     </div>

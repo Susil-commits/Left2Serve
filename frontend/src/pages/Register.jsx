@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 const roles = [
   { value: 'donor', icon: '🏪', title: 'Food Donor', desc: 'Restaurants, hotels, caterers, events, households' },
@@ -25,7 +26,9 @@ export default function Register() {
       <div className="relative w-full max-w-lg mx-4 animate-scale-in">
         <div className="premium-card-elevated p-8">
           <div className="text-center mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white font-bold text-lg mx-auto mb-5 shadow-red hover-glow transition-all">L2</div>
+            <Link to="/" className="inline-flex mb-5 group">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white font-bold text-lg mx-auto shadow-red hover-glow transition-all">L2</div>
+            </Link>
             <h2 className="text-2xl font-bold text-text">Create Account</h2>
             <p className="text-subtle text-sm mt-2">Join the movement to reduce food waste</p>
           </div>
@@ -35,10 +38,11 @@ export default function Register() {
               <div><label className="block text-sm font-semibold text-subtle mb-2">Full Name *</label><input type="text" value={form.name} onChange={update('name')} required className="input-field" placeholder="John Doe" /></div>
               <div><label className="block text-sm font-semibold text-subtle mb-2">Email *</label><input type="email" value={form.email} onChange={update('email')} required className="input-field" placeholder="john@email.com" /></div>
             </div>
-            <div><label className="block text-sm font-semibold text-subtle mb-2">Password *</label><input type="password" value={form.password} onChange={update('password')} required minLength={6} className="input-field" placeholder="Min. 6 characters" /></div>
+            <div><label className="block text-sm font-semibold text-subtle mb-2">Password *</label><input type="password" value={form.password} onChange={update('password')} required minLength={8} className="input-field" placeholder="Min. 8 characters, mix of letters, numbers & symbols" /><PasswordStrengthMeter value={form.password} /></div>
             <div><label className="block text-sm font-semibold text-subtle mb-3">I am a...</label>
               <div className="space-y-2">{roles.map(r => (
-                <label key={r.value} onClick={() => setForm({ ...form, role: r.value })} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 ${form.role === r.value ? 'bg-accent/5 border-2 border-accent/20 shadow-sm' : 'bg-gray-50 border-2 border-transparent hover:border-border hover:bg-white'}`}>
+                <label key={r.value} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 ${form.role === r.value ? 'bg-accent/5 border-2 border-accent/20 shadow-sm' : 'bg-gray-50 border-2 border-transparent hover:border-border hover:bg-white'}`}>
+                  <input type="radio" name="role" value={r.value} checked={form.role === r.value} onChange={update('role')} className="sr-only" />
                   <span className="text-2xl">{r.icon}</span><div className="flex-1"><div className="font-semibold text-sm text-text">{r.title}</div><div className="text-xs text-subtle">{r.desc}</div></div>
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${form.role === r.value ? 'border-accent bg-accent' : 'border-muted'}`}>{form.role === r.value && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}</div>
                 </label>
@@ -52,6 +56,7 @@ export default function Register() {
             <button type="submit" disabled={loading} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect">{loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating account...</span> : 'Create Account'}</button>
           </form>
           <p className="text-center text-sm text-muted mt-6">Already have an account? <Link to="/login" className="text-accent hover:text-accent-dark font-semibold transition-colors">Sign in</Link></p>
+          <p className="text-center text-xs text-muted mt-2"><Link to="/" className="hover:text-accent transition-colors">← Back to home</Link></p>
         </div>
       </div>
     </div>

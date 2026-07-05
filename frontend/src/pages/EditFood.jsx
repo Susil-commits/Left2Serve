@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { useAuth } from '../components/AuthContext';
 import ImageUpload from '../components/ImageUpload';
 import { useToast } from '../components/Toast';
 
@@ -15,6 +16,7 @@ const categories = [
 export default function EditFood() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { addToast } = useToast();
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,6 +27,11 @@ export default function EditFood() {
     (async () => {
       try {
         const listing = await api.listings.getOne(id);
+        if (user.role !== 'admin' && listing.user_id !== user.id) {
+          addToast('You can only edit your own listings', 'error');
+          navigate(`/food/${id}`, { replace: true });
+          return;
+        }
         setForm({
           title: listing.title || '',
           description: listing.description || '',
@@ -43,9 +50,11 @@ export default function EditFood() {
       }
       setLoading(false);
     })();
-  }, [id]);
+  }, [id, user, navigate, addToast]);
 
   const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+  const [nowLocal] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+  const isFormValid = form.title && form.category && form.quantity && form.expiry_date && form.pickup_address;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -108,7 +117,7 @@ export default function EditFood() {
               <label className="block text-sm font-semibold text-text mb-2">Category</label>
               <div className="grid grid-cols-2 gap-2">
                 {categories.map(c => (
-                  <button type="button" key={c.value} onClick={() => setForm({ ...form, category: c.value })}
+                  <button type="button" key={c.value} onClick={() => setForm({ ...form, category: c.value })} aria-pressed={form.category === c.value}
                     className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
                       form.category === c.value ? 'bg-accent/5 border-accent/30 text-accent' : 'bg-white border-border text-subtle hover:border-accent/20'
                     }`}>
@@ -142,15 +151,15 @@ export default function EditFood() {
               <label className="block text-sm font-semibold text-text mb-2">Status</label>
               <select value={form.status} onChange={update('status')} className="input-field select-field">
                 <option value="available">Available</option>
-                <option value="reserved">Reserved</option>
-                <option value="collected">Collected</option>
-                <option value="cancelled">Cancelled</option>
+                <option value="cancelled">Cancelled (withdraw)</option>
+                {(form.status === 'reserved' || form.status === 'collected') && <option value={form.status} disabled>{form.status} (system-managed)</option>}
               </select>
+              <p className="text-xs text-muted mt-1.5">Reserved &amp; collected states are managed by the reservation flow.</p>
             </div>
           </div>
           <div>
             <label className="block text-sm font-semibold text-text mb-2">Expiry Date</label>
-            <input type="datetime-local" value={form.expiry_date} onChange={update('expiry_date')} required className="input-field" />
+            <input type="datetime-local" value={form.expiry_date} onChange={update('expiry_date')} min={nowLocal} required className="input-field" />
           </div>
         </div>
 
@@ -173,7 +182,7 @@ export default function EditFood() {
 
         <div className="flex gap-3">
           <button type="button" onClick={() => navigate('/dashboard')} className="btn-outline flex-1 !py-3 !rounded-2xl">Cancel</button>
-          <button type="submit" disabled={saving} className="btn-primary flex-1 !py-3 !rounded-2xl text-base">
+          <button type="submit" disabled={saving || !isFormValid} className="btn-primary flex-1 !py-3 !rounded-2xl text-base disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</span> : 'Save Changes'}
           </button>
         </div>

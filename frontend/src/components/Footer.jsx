@@ -32,8 +32,6 @@ export default function Footer() {
             <h4 className="font-semibold text-white mb-3 text-sm">Contact</h4>
             <div className="space-y-2 text-white/50 text-sm">
               <div>hello@left2serve.org</div>
-              <div>+91 98765 43210</div>
-              <div>Bangalore, India</div>
             </div>
           </div>
         </div>

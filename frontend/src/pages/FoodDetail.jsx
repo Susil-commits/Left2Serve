@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
+import Lightbox from '../components/Lightbox';
 
 const categoryLabels = { event: 'Event', restaurant: 'Restaurant', hotel: 'Hotel', caterer: 'Caterer', household: 'Household' };
 const categoryIcons = { event: '🎉', restaurant: '🍽️', hotel: '🏨', caterer: '🍱', household: '🏠' };
@@ -19,6 +21,7 @@ export default function FoodDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const confirm = useConfirm();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reserving, setReserving] = useState(false);
@@ -28,6 +31,7 @@ export default function FoodDetail() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [activeImage, setActiveImage] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -54,7 +58,8 @@ export default function FoodDetail() {
   };
 
   const handleDelete = async () => {
-    if (!confirm('Delete this listing?')) return;
+    const ok = await confirm({ title: 'Delete this listing?', message: 'This action cannot be undone. The listing and its image will be permanently removed.', confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     try {
       await api.listings.delete(id);
       addToast('Listing deleted', 'success');
@@ -88,11 +93,15 @@ export default function FoodDetail() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 page-transition">
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm font-semibold text-subtle hover:text-accent transition-colors mb-6 group">
+        <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+        Back
+      </button>
       <div className="premium-card-elevated overflow-hidden animate-scale-in">
         {listing.image_urls?.length > 0 ? (
           <div>
-            <div className="aspect-video bg-gray-50 relative overflow-hidden">
-              <img src={listing.image_urls[activeImage]} alt={listing.title} className="w-full h-full object-cover" />
+            <div className="aspect-video bg-gray-50 relative overflow-hidden cursor-zoom-in" onClick={() => setLightboxOpen(true)}>
+              <img src={listing.image_urls[activeImage]} alt={listing.title} loading="lazy" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
               <div className="absolute top-4 left-4 flex gap-2">
                 <span className="badge badge-outline !bg-white/90 backdrop-blur-sm">{categoryIcons[listing.category]} {categoryLabels[listing.category]}</span>
@@ -105,7 +114,7 @@ export default function FoodDetail() {
                 {listing.image_urls.map((url, i) => (
                   <button key={i} onClick={() => setActiveImage(i)}
                     className={`w-16 h-16 rounded-xl overflow-hidden border-2 flex-shrink-0 transition-all ${activeImage === i ? 'border-accent shadow-md' : 'border-transparent opacity-60 hover:opacity-100'}`}>
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <img src={url} alt={`Photo ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -166,8 +175,22 @@ export default function FoodDetail() {
             </div>
           </div>
 
-          {isOwner && (
+          {listing.donor_phone && (user?.role === 'ngo' || user?.role === 'volunteer') && !isOwner && (
+            <div className="mb-6 p-5 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+              </div>
+              <div>
+                <div className="text-[11px] text-emerald-700 font-semibold uppercase tracking-wider">Donor contact</div>
+                <div className="text-sm text-text font-bold">{listing.donor_phone}</div>
+                <p className="text-xs text-emerald-700/80 mt-0.5">Shared once your reservation is approved</p>
+              </div>
+            </div>
+          )}
+
+          {isOwner && listing.status !== 'collected' && (
             <div className="mb-6 flex gap-3">
+              <Link to={`/edit-food/${listing.id}`} className="flex-1 px-4 py-3 bg-gray-50 border border-border text-text rounded-2xl text-sm font-semibold hover:bg-gray-100 transition-colors text-center">Edit Listing</Link>
               <button onClick={handleDelete} className="flex-1 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm font-semibold hover:bg-red-100 transition-colors">Delete Listing</button>
             </div>
           )}
@@ -219,6 +242,9 @@ export default function FoodDetail() {
           )}
         </div>
       </div>
+      {lightboxOpen && listing.image_urls?.length > 0 && (
+        <Lightbox images={listing.image_urls} index={activeImage} onClose={() => setLightboxOpen(false)} onNavigate={setActiveImage} />
+      )}
     </div>
   );
 }

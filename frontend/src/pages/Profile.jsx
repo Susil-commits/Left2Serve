@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../components/AuthContext';
 import { api } from '../api';
 import { useToast } from '../components/Toast';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 export default function Profile() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, changePassword } = useAuth();
   const { addToast } = useToast();
   const [form, setForm] = useState(() => ({
     name: user?.name || '',
@@ -50,13 +51,13 @@ export default function Profile() {
       addToast('Passwords do not match', 'error');
       return;
     }
-    if (passwordForm.newPass.length < 6) {
-      addToast('Password must be at least 6 characters', 'error');
+    if (passwordForm.newPass.length < 8) {
+      addToast('Password must be at least 8 characters', 'error');
       return;
     }
     setChangingPassword(true);
     try {
-      await api.auth.changePassword(passwordForm);
+      await changePassword(passwordForm);
       addToast('Password changed successfully', 'success');
       setPasswordForm({ current: '', newPass: '', confirm: '' });
       setShowPassword(false);
@@ -159,7 +160,8 @@ export default function Profile() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-text mb-2">New Password</label>
-                <input type="password" value={passwordForm.newPass} onChange={e => setPasswordForm({ ...passwordForm, newPass: e.target.value })} required minLength={6} className="input-field" placeholder="Min. 6 characters" />
+                <input type="password" value={passwordForm.newPass} onChange={e => setPasswordForm({ ...passwordForm, newPass: e.target.value })} required minLength={8} className="input-field" placeholder="Min. 8 characters" />
+                <PasswordStrengthMeter value={passwordForm.newPass} />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-text mb-2">Confirm Password</label>

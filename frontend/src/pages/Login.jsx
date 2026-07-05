@@ -5,6 +5,7 @@ import { useAuth } from '../components/AuthContext';
 export default function Login() {
   const [searchParams] = useSearchParams();
   const isRegistered = searchParams.get('registered') === 'true';
+  const isExpired = searchParams.get('expired') === 'true';
   const redirectTo = searchParams.get('redirect') || '/dashboard';
   const prefillEmail = isRegistered ? sessionStorage.getItem('prefill_email') || '' : '';
   const prefillPassword = isRegistered ? sessionStorage.getItem('prefill_password') || '' : '';
@@ -19,7 +20,7 @@ export default function Login() {
   const [adminCode, setAdminCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [successMsg] = useState(isRegistered ? 'Account created successfully! Please sign in.' : '');
+  const [successMsg] = useState(isRegistered ? 'Account created successfully! Please sign in.' : (isExpired ? 'Your session has expired. Please sign in again.' : ''));
   const { login, adminLogin } = useAuth();
   const navigate = useNavigate();
 
@@ -58,7 +59,9 @@ export default function Login() {
       <div className="relative w-full max-w-md mx-4 animate-scale-in">
         <div className="premium-card-elevated p-8">
           <div className="text-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white font-bold text-lg mx-auto mb-5 shadow-red hover-glow transition-all">L2</div>
+            <Link to="/" className="inline-flex items-center gap-2 mb-5 group">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white font-bold text-lg mx-auto shadow-red hover-glow transition-all">L2</div>
+            </Link>
             <h2 className="text-2xl font-bold text-text">
               {mode === 'user' ? 'Welcome Back' : 'Admin Access'}
             </h2>
@@ -68,8 +71,14 @@ export default function Login() {
           </div>
 
           {successMsg && mode === 'user' && (
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-2xl mb-6 text-sm flex items-start gap-3 font-medium">
-              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <div className={`p-4 rounded-2xl mb-6 text-sm flex items-start gap-3 font-medium border ${
+              isExpired ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            }`}>
+              {isExpired ? (
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              ) : (
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              )}
               {successMsg}
             </div>
           )}
@@ -128,6 +137,7 @@ export default function Login() {
                 {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Signing in...</span> : 'Sign In'}
               </button>
               <p className="text-center text-sm text-muted pt-2">Don't have an account? <Link to="/register" className="text-accent hover:text-accent-dark font-semibold transition-colors">Create one</Link></p>
+              <p className="text-center text-xs text-muted"><Link to="/" className="hover:text-accent transition-colors">← Back to home</Link></p>
             </form>
           ) : (
             <form onSubmit={handleAdminSubmit} className="space-y-4">
@@ -142,6 +152,7 @@ export default function Login() {
                 {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Authenticating...</span> : 'Access Admin Panel'}
               </button>
               <p className="text-center text-xs text-muted pt-2">Authorized personnel only</p>
+              <p className="text-center text-xs text-muted"><Link to="/" className="hover:text-accent transition-colors">← Back to home</Link></p>
             </form>
           )}
         </div>
