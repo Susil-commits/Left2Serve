@@ -1,4 +1,12 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+// Build the API base. Accepts VITE_API_URL with or without a trailing "/api".
+// e.g. "https://x.onrender.com" and "https://x.onrender.com/api" both resolve correctly.
+function resolveApiBase() {
+  const raw = (import.meta.env.VITE_API_URL || '').trim();
+  if (!raw) return '/api';
+  const noSlash = raw.replace(/\/+$/, '');
+  return noSlash.endsWith('/api') ? noSlash : `${noSlash}/api`;
+}
+const API_BASE = resolveApiBase();
 const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/admin/login'];
 
 async function request(endpoint, options = {}) {
