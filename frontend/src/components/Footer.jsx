@@ -38,6 +38,11 @@ export default function Footer() {
         <div className="mt-8 pt-6 border-t border-white/10 text-center text-white/30 text-xs">
           &copy; {new Date().getFullYear()} Left2Serve. All rights reserved.
           <Link to="/login" className="text-white/15 hover:text-white/30 transition-colors ml-2">Admin</Link>
+          <p className="mt-3 max-w-2xl mx-auto leading-relaxed">
+            🚀 Demo hosted on free tiers (Vercel + Render). The backend may take ~30–50s to wake up
+            after inactivity — if the site seems slow or empty, please refresh once. All features work
+            on a fully managed PostgreSQL database.
+          </p>
         </div>
       </div>
     </footer>
