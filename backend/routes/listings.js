@@ -142,7 +142,7 @@ router.post('/', authMiddleware, roleMiddleware('donor'), async (req, res) => {
   if (new Date(expiry_date).toString() === 'Invalid Date' || new Date(expiry_date) <= new Date()) return res.status(400).json({ error: 'Expiry date must be in the future' });
   try {
     const images = sanitizeImageUrls(image_urls);
-    const id = await insert(`INSERT INTO food_listings (user_id, title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [req.user.id, String(title).trim(), description || null, category, qty, unit || 'servings', price || 0, expiry_date, String(pickup_address).trim(), pickup_instructions || null, images]);
+    const id = await insert(`INSERT INTO food_listings (user_id, title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [req.user.id, String(title).trim(), description || null, category, qty, unit || 'servings', price || 0, expiry_date, String(pickup_address).trim(), pickup_instructions || null, JSON.stringify(images)]);
     const listing = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [id]);
     res.status(201).json(withRemaining(listing));
   } catch (err) { res.status(500).json({ error: 'Failed to create listing' }); }
@@ -161,7 +161,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
   if (expiry_date && (new Date(expiry_date).toString() === 'Invalid Date' || new Date(expiry_date) <= new Date())) return res.status(400).json({ error: 'Expiry date must be in the future' });
   try {
     const images = sanitizeImageUrls(image_urls ?? listing.image_urls);
-    await run(`UPDATE food_listings SET title=?, description=?, category=?, quantity=?, unit=?, price=?, expiry_date=?, pickup_address=?, pickup_instructions=?, image_urls=?, status=? WHERE id=?`, [title ? String(title).trim() : listing.title, description ?? listing.description, nextCategory, nextQty, unit || listing.unit, price ?? listing.price, nextExpiry, pickup_address ? String(pickup_address).trim() : listing.pickup_address, pickup_instructions ?? listing.pickup_instructions, images, status || listing.status, req.params.id]);
+    await run(`UPDATE food_listings SET title=?, description=?, category=?, quantity=?, unit=?, price=?, expiry_date=?, pickup_address=?, pickup_instructions=?, image_urls=?, status=? WHERE id=?`, [title ? String(title).trim() : listing.title, description ?? listing.description, nextCategory, nextQty, unit || listing.unit, price ?? listing.price, nextExpiry, pickup_address ? String(pickup_address).trim() : listing.pickup_address, pickup_instructions ?? listing.pickup_instructions, JSON.stringify(images), status || listing.status, req.params.id]);
     await recomputeListingStatus(req.params.id);
     const updated = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [req.params.id]);
     res.json(withRemaining(updated));

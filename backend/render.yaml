@@ -11,22 +11,14 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        sync: false
       - key: JWT_SECRET
         sync: false
       - key: ADMIN_CODE
         sync: false
       - key: CLIENT_URL
         sync: false
-      - key: DB_HOST
-        sync: false
-      - key: DB_PORT
-        value: 3306
-      - key: DB_USER
-        sync: false
-      - key: DB_PASSWORD
-        sync: false
-      - key: DB_NAME
-        value: left2serve
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
@@ -37,3 +29,7 @@ services:
         sync: false
       - key: RAZORPAY_KEY_SECRET
         sync: false
+databases:
+  - name: left2serve-db
+    databaseName: left2serve
+    plan: free

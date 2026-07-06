@@ -8,7 +8,7 @@ A full-stack food redistribution platform connecting surplus food donors with NG
 |-------|-----------|
 | Frontend | React 19 + Vite + Tailwind CSS 4 |
 | Backend | Node.js + Express 4 |
-| Database | MySQL |
+| Database | PostgreSQL |
 | Image Hosting | Cloudinary |
 | Auth | JWT (bcryptjs) |
 
@@ -31,7 +31,7 @@ Left2Serve/
 
 ### Prerequisites
 - Node.js 18+
-- MySQL 8+
+- PostgreSQL 14+
 - Cloudinary account (for image uploads)
 
 ### Backend
@@ -58,11 +58,13 @@ The frontend dev server proxies `/api` requests to `http://localhost:5000`.
 | Variable | Description |
 |----------|-------------|
 | `PORT` | Server port (default: 5000) |
-| `DB_HOST` | MySQL host |
-| `DB_PORT` | MySQL port |
-| `DB_USER` | MySQL user |
-| `DB_PASSWORD` | MySQL password |
+| `DATABASE_URL` | PostgreSQL connection string (preferred on Render). If set, the `DB_*` vars below are ignored |
+| `DB_HOST` | PostgreSQL host (used when `DATABASE_URL` is not set) |
+| `DB_PORT` | PostgreSQL port (default: 5432) |
+| `DB_USER` | PostgreSQL user |
+| `DB_PASSWORD` | PostgreSQL password |
 | `DB_NAME` | Database name |
+| `DB_SSL` | Set to `1` if the host requires SSL (Render external URL, PlanetScale, etc.) |
 | `JWT_SECRET` | JWT signing secret — **required**, must be ≥ 16 chars (server refuses to start otherwise) |
 | `ADMIN_CODE` | Admin login code |
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
@@ -231,8 +233,8 @@ Notifications are generated automatically on reservation events (new request, ap
 1. In Render, create a new **Web Service** and connect the same GitHub repo. Set the **Root Directory** to `backend`.
 2. Or use the included `render.yaml` (Blueprint) — Render will auto-detect the config (Node runtime, `npm install` build, `npm start` command, `/api/health` health check).
 3. Set all environment variables (see table below). `JWT_SECRET` and `ADMIN_CODE` are required — the server refuses to start without a valid `JWT_SECRET` (≥ 16 chars).
-4. For the database, create a Render **MySQL** instance (or use any external MySQL 8+ provider) and copy the connection credentials into `DB_*` vars.
-5. On first boot the server auto-creates the database and all tables, then runs an expiry sweep.
+4. For the database, create a Render **PostgreSQL** instance (or use any external PostgreSQL 14+ provider) and link it to the web service so Render injects `DATABASE_URL` automatically. Alternatively, paste the external `DATABASE_URL` into the env vars.
+5. On first boot the server auto-creates all tables (the database itself must already exist — Render Postgres creates it for you).
 6. Set `CLIENT_URL` to your Vercel frontend URL (e.g. `https://left2serve.vercel.app`) so CORS allows it.
 
 ### Required Environment Variables
@@ -243,9 +245,10 @@ Notifications are generated automatically on reservation events (new request, ap
 | `PORT` | — | ✅ | Auto-set by Render |
 | `NODE_ENV` | — | ✅ | Set to `production` |
 | `CLIENT_URL` | — | ✅ | Vercel frontend URL for CORS |
+| `DATABASE_URL` | — | ✅ | PostgreSQL connection string (injected when DB is linked on Render) |
+| `DB_SSL` | — | optional | `1` if the Postgres host requires SSL |
 | `JWT_SECRET` | — | ✅ | ≥ 16 chars, random |
 | `ADMIN_CODE` | — | ✅ | Admin login code |
-| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | — | ✅ | MySQL connection |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | — | ✅ | Image uploads (server returns 503 if not set) |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | — | ✅ | Online payments via Razorpay (COD still works if unset) |
 | `VITE_RAZORPAY_KEY_ID` | ✅ | — | Razorpay public key for the checkout |

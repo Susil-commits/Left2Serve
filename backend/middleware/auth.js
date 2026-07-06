@@ -17,7 +17,7 @@ async function verifyToken(token) {
   }
   const user = await get('SELECT token_version, is_active FROM users WHERE id = ?', [decoded.id]);
   if (!user) throw new Error('user gone');
-  if (user.is_active === 0) throw new Error('suspended');
+  if (!user.is_active) throw new Error('suspended');
   if (Number(decoded.tv || 0) !== Number(user.token_version || 0)) throw new Error('token revoked');
   return decoded;
 }

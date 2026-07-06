@@ -147,7 +147,7 @@ router.patch('/users/:id', authMiddleware, roleMiddleware('admin'), async (req, 
     }
     if (isActive !== undefined) {
       updates.push('is_active = ?');
-      params.push(isActive ? 1 : 0);
+      params.push(!!isActive);
     }
     if (updates.length === 0) return res.status(400).json({ error: 'No valid fields to update' });
     params.push(req.params.id);
@@ -203,11 +203,11 @@ router.get('/trends', authMiddleware, roleMiddleware('admin'), async (req, res) 
   try {
     const days = Math.min(parseInt(req.query.days) || 14, 90);
     const reservations = await all(
-      `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') as date, COUNT(*) as count FROM reservations WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) GROUP BY DATE(created_at) ORDER BY date ASC`,
+      `SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date, COUNT(*) as count FROM reservations WHERE created_at >= CURRENT_DATE - INTERVAL '1 day' * ? GROUP BY created_at::date ORDER BY date ASC`,
       [days]
     );
     const meals = await all(
-      `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') as date, COALESCE(SUM(quantity), 0) as count FROM reservations WHERE status = 'collected' AND created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) GROUP BY DATE(created_at) ORDER BY date ASC`,
+      `SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date, COALESCE(SUM(quantity), 0) as count FROM reservations WHERE status = 'collected' AND created_at >= CURRENT_DATE - INTERVAL '1 day' * ? GROUP BY created_at::date ORDER BY date ASC`,
       [days]
     );
     const mealsMap = new Map(meals.map((m) => [String(m.date), Number(m.count)]));

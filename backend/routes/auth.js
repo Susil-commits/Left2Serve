@@ -54,14 +54,14 @@ router.post('/login', async (req, res) => {
     if (!ok) {
       const attempts = Number(user.failed_attempts || 0) + 1;
       if (attempts >= MAX_FAILED) {
-        await run('UPDATE users SET failed_attempts = 0, locked_until = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?', [user.id]);
+        await run("UPDATE users SET failed_attempts = 0, locked_until = NOW() + INTERVAL '15 minutes' WHERE id = ?", [user.id]);
       } else {
         await run('UPDATE users SET failed_attempts = ? WHERE id = ?', [attempts, user.id]);
       }
       await audit({ actorRole: 'anonymous', action: 'login_failed', targetType: 'user', targetId: user.id, detail: `attempt ${attempts}`, ip: req.ip });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    if (user.is_active === 0) {
+    if (!user.is_active) {
       await audit({ actorId: user.id, actorRole: user.role, action: 'login_blocked_suspended', ip: req.ip });
       return res.status(403).json({ error: 'Your account has been suspended. Contact an administrator.' });
     }

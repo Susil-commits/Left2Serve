@@ -65,4 +65,7 @@ initializeDb().then(async () => {
   await sweepExpiredListings();
   setInterval(sweepExpiredListings, 5 * 60 * 1000);
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}).catch((err) => {
+  console.error('FATAL: Failed to start server:\n' + (err.message || err));
+  process.exit(1);
 });
