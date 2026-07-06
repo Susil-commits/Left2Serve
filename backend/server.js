@@ -24,6 +24,21 @@ app.set('trust proxy', 1);
 
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 
+// Build the allowed-origin list: explicit CLIENT_URL value(s) plus any
+// *.vercel.app deployment and localhost dev servers, so the exact domain
+// spelling in CLIENT_URL can't break CORS.
+const allowedOrigins = new Set([
+  ...clientUrl.split(',').map((s) => s.trim()).filter(Boolean),
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:5173',
+]);
+function corsOrigin(origin, cb) {
+  if (!origin) return cb(null, true); // same-origin / curl / postman
+  if (allowedOrigins.has(origin) || /\.vercel\.app$/.test(new URL(origin).hostname)) return cb(null, true);
+  cb(new Error(`CORS blocked: ${origin}`));
+}
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   crossOriginOpenerPolicy: { policy: 'same-origin' },
@@ -31,7 +46,7 @@ app.use(helmet({
   strictTransportSecurity: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
   contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], frameAncestors: ["'none'"], baseUri: ["'self'"] } },
 }));
-app.use(cors({ origin: clientUrl.split(',').map(s => s.trim()), credentials: true }));
+app.use(cors({ origin: corsOrigin, credentials: true, maxAge: 86400 }));
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(morgan(isProduction ? 'combined' : 'dev'));
