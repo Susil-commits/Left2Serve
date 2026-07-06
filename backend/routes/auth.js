@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { get, insert, run } from '../db/database.js';
+import { get, all, insert, run } from '../db/database.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validatePassword } from '../db/password.js';
 import { audit } from '../db/audit.js';
