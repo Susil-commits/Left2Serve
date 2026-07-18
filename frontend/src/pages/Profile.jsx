@@ -13,6 +13,7 @@ export default function Profile() {
     phone: user?.phone || '',
     address: user?.address || '',
     organization: user?.organization || '',
+    avatar_url: user?.avatar_url || '',
   }));
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -30,6 +31,7 @@ export default function Profile() {
         phone: user.phone || '',
         address: user.address || '',
         organization: user.organization || '',
+        avatar_url: user.avatar_url || '',
       });
     }
   }, [user, editing]);
@@ -80,6 +82,24 @@ export default function Profile() {
 
   const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('images', file);
+    setLoading(true);
+    try {
+      const res = await api.listings.upload(formData);
+      if (res.urls && res.urls[0]) {
+        setForm({ ...form, avatar_url: res.urls[0] });
+        addToast('Avatar uploaded, click Save Changes to apply', 'success');
+      }
+    } catch (err) {
+      addToast('Failed to upload avatar', 'error');
+    }
+    setLoading(false);
+  };
+
   const roleIcons = { donor: '🏪', ngo: '🏛️', volunteer: '🙋', admin: '🛡️' };
   const roleLabels = { donor: 'Food Donor', ngo: 'NGO / Shelter', volunteer: 'Volunteer', admin: 'Administrator' };
 
@@ -92,7 +112,13 @@ export default function Profile() {
 
       <div className="premium-card-elevated p-8 animate-scale-in">
         <div className="flex items-center gap-5 mb-8 pb-8 border-b border-border">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center text-white text-2xl font-bold shadow-red flex-shrink-0">{user?.name?.[0] || '?'}</div>
+          <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center text-white text-2xl font-bold shadow-red flex-shrink-0 overflow-hidden">
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+            ) : (
+              user?.name?.[0] || '?'
+            )}
+          </div>
           <div>
             <h2 className="text-xl font-bold text-text">{user?.name}</h2>
             <div className="flex items-center gap-2 mt-1">
@@ -127,6 +153,19 @@ export default function Profile() {
           </div>
         ) : (
           <form onSubmit={handleSave} className="space-y-5">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl bg-gray-100 flex flex-shrink-0 items-center justify-center overflow-hidden border border-border">
+                 {form.avatar_url ? (
+                   <img src={form.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                 ) : (
+                   <span className="text-gray-400">?</span>
+                 )}
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-semibold text-text mb-1">Profile Picture</label>
+                <input type="file" accept="image/*" onChange={handleAvatarUpload} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20 cursor-pointer" />
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-semibold text-text mb-2">Full Name</label>
               <input type="text" value={form.name} onChange={update('name')} required className="input-field" placeholder="Your name" />

@@ -1,6 +1,16 @@
 import { insert } from './database.js';
 
-export async function audit({ actorId, actorRole, action, targetType, targetId, detail, ip }) {
+export interface AuditLogOptions {
+  actorId?: number;
+  actorRole?: string;
+  action: string;
+  targetType?: string;
+  targetId?: number;
+  detail?: string;
+  ip?: string;
+}
+
+export async function audit({ actorId, actorRole, action, targetType, targetId, detail, ip }: AuditLogOptions) {
   try {
     await insert(
       'INSERT INTO audit_log (actor_id, actor_role, action, target_type, target_id, detail, ip) VALUES (?, ?, ?, ?, ?, ?, ?)',

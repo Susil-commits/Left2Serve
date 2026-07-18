@@ -49,17 +49,21 @@ export default function Navbar() {
 
             <div className="hidden md:flex items-center gap-1">
               <Link to="/browse" aria-label="Browse food listings" className={`btn-ghost ${isActive('/browse')}`}>Browse</Link>
+              <Link to="/forum" aria-label="Community Forum" className={`btn-ghost ${isActive('/forum')}`}>Community</Link>
               <Link to="/impact" aria-label="Community impact" className={`btn-ghost ${isActive('/impact')}`}>Impact</Link>
               <Link to="/saved" aria-label={`Saved listings${favCount ? ` (${favCount})` : ''}`} className={`btn-ghost relative ${isSavedActive()}`}>
                 Saved
                 {favCount > 0 && <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-accent text-white text-[9px] font-bold flex items-center justify-center">{favCount > 9 ? '9+' : favCount}</span>}
               </Link>
               {user?.role === 'admin' && <Link to="/admin/dashboard" onClick={closeMobile} className={`btn-ghost ${isActive('/admin/dashboard')}`}>Admin Panel</Link>}
+              {(user?.role === 'ngo' || user?.role === 'volunteer') && <Link to="/watchlists" onClick={closeMobile} className={`btn-ghost ${isActive('/watchlists')}`}>Watchlists</Link>}
               {navLinks}
               {user && <NotificationBell />}
               {user ? (
                 <div className="flex items-center gap-3 ml-4 pl-4 border-l border-border">
-                  <Link to="/profile" aria-label="View profile" className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent text-xs font-bold shadow-sm group-hover-scale hover:ring-2 hover:ring-accent/20 transition-all">{user.name[0]}</Link>
+                  <Link to="/profile" aria-label="View profile" className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent text-xs font-bold shadow-sm group-hover-scale hover:ring-2 hover:ring-accent/20 transition-all overflow-hidden">
+                    {user.avatar_url ? <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" /> : user.name[0]}
+                  </Link>
                   <div className="hidden lg:block">
                     <div className="text-sm font-semibold text-text leading-tight">{user.name}</div>
                     <div className="text-xs text-accent capitalize">{user.role}</div>
@@ -89,6 +93,7 @@ export default function Navbar() {
           <div className="md:hidden glass border-t border-border animate-slide-down">
             <div className="px-4 py-4 space-y-2">
               <Link to="/browse" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/browse')}`}>Browse</Link>
+              <Link to="/forum" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/forum')}`}>Community</Link>
               <Link to="/impact" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/impact')}`}>Impact</Link>
               <Link to="/saved" onClick={closeMobile} className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isSavedActive()}`}>
                 <span>Saved</span>
@@ -101,6 +106,7 @@ export default function Navbar() {
                   ) : (
                     <>
                       <Link to="/dashboard" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/dashboard')}`}>Dashboard</Link>
+                      {(user.role === 'ngo' || user.role === 'volunteer') && <Link to="/watchlists" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/watchlists')}`}>Watchlists</Link>}
                       {user.role === 'donor' && (
                         <Link to="/list-food" onClick={closeMobile} className="block px-4 py-3 rounded-xl text-sm font-semibold text-white bg-accent text-center">List Food</Link>
                       )}

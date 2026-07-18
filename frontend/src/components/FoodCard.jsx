@@ -41,6 +41,18 @@ export default function FoodCard({ listing }) {
         </div>
         <div className="p-4">
           <h3 className="font-semibold text-text text-sm truncate mb-1 group-hover:text-accent transition-colors">{listing.title}</h3>
+          
+          {listing.dietary_preferences && listing.dietary_preferences.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {listing.dietary_preferences.slice(0, 3).map(tag => (
+                <span key={tag} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold uppercase tracking-wider">{tag}</span>
+              ))}
+              {listing.dietary_preferences.length > 3 && (
+                <span className="px-1.5 py-0.5 bg-gray-100 text-subtle rounded text-[9px] font-bold uppercase tracking-wider">+{listing.dietary_preferences.length - 3}</span>
+              )}
+            </div>
+          )}
+
           <p className="text-subtle text-xs line-clamp-2 mb-3 leading-relaxed">{listing.description || 'No description provided'}</p>
           <div className="flex justify-between items-center text-xs text-muted"><span className="font-medium text-subtle">{listing.quantity} {listing.unit}</span><span className="truncate ml-2">{listing.donor_name || listing.donor_org}</span></div>
         </div>

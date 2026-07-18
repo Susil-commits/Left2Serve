@@ -1,6 +1,6 @@
 import { get, all, run } from './database.js';
 
-export async function getAvailability(listingId) {
+export async function getAvailability(listingId: number | string) {
   const listing = await get('SELECT quantity FROM food_listings WHERE id = ?', [listingId]);
   if (!listing) return { remaining: 0, active: 0, collected: 0, quantity: 0 };
   const [row] = await all(
@@ -16,7 +16,7 @@ export async function getAvailability(listingId) {
   return { remaining, active, collected, quantity: Number(listing.quantity) };
 }
 
-export async function recomputeListingStatus(listingId) {
+export async function recomputeListingStatus(listingId: number | string) {
   const listing = await get('SELECT id, quantity, status FROM food_listings WHERE id = ?', [listingId]);
   if (!listing) return;
   if (['expired', 'cancelled', 'collected'].includes(listing.status)) return;

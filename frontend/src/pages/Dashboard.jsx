@@ -6,6 +6,9 @@ import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import StarRating from '../components/StarRating';
 import ReviewModal from '../components/ReviewModal';
+import Chat from '../components/Chat';
+import QRGenerator from '../components/QRGenerator';
+import QRScanner from '../components/QRScanner';
 
 const statusConfig = {
   available: { cls: 'badge-green', dot: 'bg-emerald-500', label: 'Available' },
@@ -50,6 +53,9 @@ export default function Dashboard() {
   const [expandedListing, setExpandedListing] = useState(null);
   const [reviewState, setReviewState] = useState({});
   const [reviewModal, setReviewModal] = useState(null);
+  const [chatReservationId, setChatReservationId] = useState(null);
+  const [showQrFor, setShowQrFor] = useState(null);
+  const [scanQr, setScanQr] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -255,6 +261,12 @@ export default function Dashboard() {
                                     </button>
                                   </>
                                 )}
+                                {r.status === 'approved' && (
+                                  <>
+                                    <button onClick={() => setChatReservationId(r.id)} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg hover:bg-blue-100 transition-colors">Chat</button>
+                                    <button onClick={() => setScanQr(true)} className="px-3 py-1.5 bg-purple-50 text-purple-700 text-xs font-semibold rounded-lg hover:bg-purple-100 transition-colors">Scan QR</button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -325,6 +337,12 @@ export default function Dashboard() {
                         </div>
                       ))}
                     </div>
+                    {r.status === 'approved' && (
+                      <div className="flex gap-2 mb-3">
+                        <button onClick={() => setChatReservationId(r.id)} className="flex-1 py-1.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg hover:bg-blue-100 transition-colors">Chat</button>
+                        <button onClick={() => setShowQrFor(r.id)} className="flex-1 py-1.5 bg-purple-50 text-purple-700 text-xs font-semibold rounded-lg hover:bg-purple-100 transition-colors">Show QR</button>
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       {r.status === 'approved' && (
                         <button onClick={() => handleReservationAction(r.id, 'collected')} disabled={actionLoading === r.id}
@@ -364,6 +382,19 @@ export default function Dashboard() {
         foodTitle={reviewModal?.foodTitle}
         onSubmitted={loadData}
       />
+
+      {chatReservationId && <Chat reservationId={chatReservationId} onClose={() => setChatReservationId(null)} />}
+      {showQrFor && <QRGenerator reservationId={showQrFor} onClose={() => setShowQrFor(null)} />}
+      {scanQr && (
+        <QRScanner 
+          onClose={() => setScanQr(false)} 
+          onSuccess={() => {
+            setScanQr(false);
+            addToast('QR Code scanned and verified successfully! Pickup is completed.', 'success');
+            loadData();
+          }} 
+        />
+      )}
     </div>
   );
 }

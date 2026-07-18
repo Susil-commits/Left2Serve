@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, API_BASE_URL } from '../api';
+import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
 const typeIcon = {
@@ -42,12 +43,26 @@ export default function NotificationBell() {
 
   useEffect(() => {
     if (!user || user.role === 'admin') return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUnread();
-    const interval = setInterval(loadUnread, 30000);
+    
+    const token = localStorage.getItem('token');
+    const socket = io(API_BASE_URL, {
+      auth: { token },
+      withCredentials: true
+    });
+    
+    socket.on('new_notification', (notif) => {
+      setUnread(u => u + 1);
+      setItems(prev => [notif, ...prev]);
+    });
+    
     const onFocus = () => loadUnread();
     window.addEventListener('focus', onFocus);
-    return () => { clearInterval(interval); window.removeEventListener('focus', onFocus); };
+    
+    return () => { 
+      socket.disconnect();
+      window.removeEventListener('focus', onFocus); 
+    };
   }, [user, loadUnread]);
 
   useEffect(() => {

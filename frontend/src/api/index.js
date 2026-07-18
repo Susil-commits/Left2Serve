@@ -7,6 +7,7 @@ function resolveApiBase() {
   return noSlash.endsWith('/api') ? noSlash : `${noSlash}/api`;
 }
 const API_BASE = resolveApiBase();
+export const API_BASE_URL = API_BASE.replace(/\/api$/, '');
 const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/admin/login'];
 
 async function request(endpoint, options = {}) {
@@ -36,6 +37,8 @@ export const api = {
     impact: () => request('/auth/impact'),
     updateProfile: (body) => request('/auth/profile', { method: 'PUT', body }),
     changePassword: (body) => request('/auth/password', { method: 'PUT', body }),
+    forgotPassword: (body) => request('/auth/forgot-password', { method: 'POST', body }),
+    resetPassword: (body) => request('/auth/reset-password', { method: 'POST', body }),
   },
   listings: {
     getAll: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/listings${qs ? `?${qs}` : ''}`); },
@@ -54,6 +57,11 @@ export const api = {
     getMine: () => request('/reservations'),
     getForListing: (listingId) => request(`/reservations/listing/${listingId}`),
     update: (id, body) => request(`/reservations/${id}`, { method: 'PATCH', body }),
+    getQrToken: (id) => request(`/reservations/${id}/qr-token`),
+    verifyQr: (body) => request('/reservations/verify-qr', { method: 'POST', body }),
+  },
+  chat: {
+    getHistory: (reservationId) => request(`/chat/${reservationId}`),
   },
   payments: {
     config: () => request('/payments/config', { method: 'POST' }),
@@ -71,6 +79,22 @@ export const api = {
     markRead: (id) => request(`/notifications/${id}/read`, { method: 'PATCH' }),
     markAllRead: () => request('/notifications/read-all', { method: 'PATCH' }),
     remove: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
+  },
+  watchlists: {
+    getAll: () => request('/watchlists'),
+    create: (body) => request('/watchlists', { method: 'POST', body }),
+    delete: (id) => request(`/watchlists/${id}`, { method: 'DELETE' }),
+  },
+  forum: {
+    getCategories: () => request('/forum/categories'),
+    getCategoryPosts: (id) => request(`/forum/categories/${id}/posts`),
+    createPost: (id, body) => request(`/forum/categories/${id}/posts`, { method: 'POST', body }),
+    getPost: (id) => request(`/forum/posts/${id}`),
+    updatePost: (id, body) => request(`/forum/posts/${id}`, { method: 'PUT', body }),
+    deletePost: (id) => request(`/forum/posts/${id}`, { method: 'DELETE' }),
+    createReply: (id, body) => request(`/forum/posts/${id}/replies`, { method: 'POST', body }),
+    updateReply: (id, body) => request(`/forum/replies/${id}`, { method: 'PUT', body }),
+    deleteReply: (id) => request(`/forum/replies/${id}`, { method: 'DELETE' }),
   },
   admin: {
     login: (body) => request('/admin/login', { method: 'POST', body }),

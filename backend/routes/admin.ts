@@ -1,8 +1,10 @@
+import { Request, Response } from 'express';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { get, all, run } from '../db/database.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
+import { validateIdParam } from '../middleware/validateParam.js';
 import { createNotification } from '../db/notify.js';
 import { audit } from '../db/audit.js';
 import { recomputeListingStatus } from '../db/availability.js';
@@ -15,7 +17,7 @@ function adminAudit(req, action, targetType, targetId, detail) {
   return audit({ actorRole: 'admin', action, targetType, targetId, detail, ip: req.ip });
 }
 
-router.post('/login', async (req, res) => {
+router.post('/login', async (req: Request, res: Response) => {
   const { adminCode } = req.body;
   if (!ADMIN_CODE) return res.status(503).json({ error: 'Admin access is not configured' });
   if (!adminCode) return res.status(400).json({ error: 'Admin code is required' });
@@ -24,7 +26,7 @@ router.post('/login', async (req, res) => {
   res.json({ token, user: { id: 0, name: 'Administrator', email: 'admin@left2serve.com', role: 'admin' } });
 });
 
-router.get('/stats', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/stats', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
   try {
     const [usersRow] = await all('SELECT COUNT(*) as count FROM users');
     const [ngosRow] = await all("SELECT COUNT(*) as count FROM users WHERE role = 'ngo'");
@@ -55,7 +57,7 @@ router.get('/stats', authMiddleware, roleMiddleware('admin'), async (req, res) =
   }
 });
 
-router.get('/users', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/users', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
   try {
     const users = await all('SELECT id, name, email, role, phone, address, organization, is_active, created_at FROM users ORDER BY created_at DESC');
     res.json(users);
@@ -64,7 +66,7 @@ router.get('/users', authMiddleware, roleMiddleware('admin'), async (req, res) =
   }
 });
 
-router.get('/ngos', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/ngos', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
   try {
     const ngos = await all("SELECT id, name, email, phone, address, organization, is_active, created_at FROM users WHERE role = 'ngo' ORDER BY created_at DESC");
     const ngosWithStats = await Promise.all(ngos.map(async (ngo) => {
@@ -79,7 +81,7 @@ router.get('/ngos', authMiddleware, roleMiddleware('admin'), async (req, res) =>
   }
 });
 
-router.get('/orders', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/orders', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
   try {
     const orders = await all(`SELECT r.*, fl.title as food_title, fl.category as food_category, fl.quantity as food_quantity, fl.unit as food_unit, fl.pickup_address, fl.expiry_date, fl.status as listing_status, u.name as reserver_name, u.email as reserver_email, u.phone as reserver_phone, u.organization as reserver_org, d.name as donor_name, d.email as donor_email FROM reservations r JOIN food_listings fl ON r.food_listing_id = fl.id JOIN users u ON r.user_id = u.id JOIN users d ON fl.user_id = d.id ORDER BY r.created_at DESC`);
     res.json(orders);
@@ -88,7 +90,7 @@ router.get('/orders', authMiddleware, roleMiddleware('admin'), async (req, res) 
   }
 });
 
-router.get('/listings', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/listings', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
   try {
     const listings = await all(`SELECT fl.*, u.name as donor_name, u.email as donor_email, u.phone as donor_phone, u.organization as donor_org FROM food_listings fl JOIN users u ON fl.user_id = u.id ORDER BY fl.created_at DESC`);
     res.json(listings.map(l => ({ ...l, image_urls: l.image_urls || [] })));
@@ -97,7 +99,7 @@ router.get('/listings', authMiddleware, roleMiddleware('admin'), async (req, res
   }
 });
 
-router.delete('/listings/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.delete('/listings/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response) => {
   try {
     const listing = await get('SELECT id, user_id, title, status FROM food_listings WHERE id = ?', [req.params.id]);
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
@@ -110,7 +112,7 @@ router.delete('/listings/:id', authMiddleware, roleMiddleware('admin'), async (r
   }
 });
 
-router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
     const allowed = ['approved', 'collected', 'cancelled'];
@@ -132,13 +134,13 @@ router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), async (req,
   }
 });
 
-router.patch('/users/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.patch('/users/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response) => {
   try {
     const { role, isActive } = req.body;
     const user = await get('SELECT id, role, is_active FROM users WHERE id = ?', [req.params.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
     const updates = [];
-    const params = [];
+    const params: any[] = [];
     if (role !== undefined) {
       if (!USER_ROLES.includes(role)) return res.status(400).json({ error: 'Invalid role' });
       if (user.role === 'admin') return res.status(400).json({ error: 'Cannot modify admin role' });
@@ -162,7 +164,7 @@ router.patch('/users/:id', authMiddleware, roleMiddleware('admin'), async (req, 
   }
 });
 
-router.delete('/users/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.delete('/users/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response) => {
   try {
     const user = await get('SELECT id, role FROM users WHERE id = ?', [req.params.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -175,7 +177,7 @@ router.delete('/users/:id', authMiddleware, roleMiddleware('admin'), async (req,
   }
 });
 
-router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response) => {
   try {
     const user = await get('SELECT id, role, email FROM users WHERE id = ?', [req.params.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -199,9 +201,9 @@ router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), asy
   }
 });
 
-router.get('/trends', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/trends', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
   try {
-    const days = Math.min(parseInt(req.query.days) || 14, 90);
+    const days = Math.min(parseInt((req.query.days as string)) || 14, 90);
     const reservations = await all(
       `SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date, COUNT(*) as count FROM reservations WHERE created_at >= CURRENT_DATE - INTERVAL '1 day' * ? GROUP BY created_at::date ORDER BY date ASC`,
       [days]
@@ -231,9 +233,9 @@ router.get('/trends', authMiddleware, roleMiddleware('admin'), async (req, res) 
   }
 });
 
-router.get('/audit-log', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/audit-log', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const limit = Math.min(parseInt((req.query.limit as string)) || 50, 200);
     const logs = await all(
       'SELECT id, actor_id, actor_role, action, target_type, target_id, detail, ip, created_at FROM audit_log ORDER BY created_at DESC LIMIT ?',
       [limit]

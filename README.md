@@ -218,24 +218,31 @@ Notifications are generated automatically on reservation events (new request, ap
 | GET | `/api/admin/audit-log` | JWT (admin) |
 | PATCH | `/api/admin/orders/:id` | JWT (admin) |
 
-## Deployment
+## Deployment 🚀 (Ready for Production)
 
-### Frontend → Vercel
+This repository is pre-configured for seamless zero-config deployment to **Vercel** (Frontend) and **Render** (Backend).
 
-1. Push the repo to GitHub.
-2. In Vercel, import the repo and set the **Root Directory** to `frontend`.
-3. The `vercel.json` handles the build (`npm run build`), output (`dist`), and SPA routing rewrites automatically.
-4. Add the environment variable `VITE_API_URL` = your Render backend URL (e.g. `https://left2serve-api.onrender.com`). Leave empty for local dev.
-5. Deploy. Vercel will build and serve the SPA with all routes rewriting to `index.html`.
+### Frontend → Vercel (Zero-Config)
 
-### Backend → Render
+The frontend is a Vite SPA. The included `vercel.json` and `package.json` are fully configured.
+1. Push the repository to GitHub.
+2. Go to [Vercel](https://vercel.com) and import the repository.
+3. Set the **Root Directory** to `frontend`.
+4. Vercel will automatically detect Vite. The `vercel.json` takes care of SPA routing (rewrites to `index.html`).
+5. **Environment Variable:** Add `VITE_API_URL` and set it to your Render backend URL (e.g., `https://left2serve-api.onrender.com`).
+6. Click **Deploy**.
 
-1. In Render, create a new **Web Service** and connect the same GitHub repo. Set the **Root Directory** to `backend`.
-2. Or use the included `render.yaml` (Blueprint) — Render will auto-detect the config (Node runtime, `npm install` build, `npm start` command, `/api/health` health check).
-3. Set all environment variables (see table below). `JWT_SECRET` and `ADMIN_CODE` are required — the server refuses to start without a valid `JWT_SECRET` (≥ 16 chars).
-4. For the database, create a Render **PostgreSQL** instance (or use any external PostgreSQL 14+ provider) and link it to the web service so Render injects `DATABASE_URL` automatically. Alternatively, paste the external `DATABASE_URL` into the env vars.
-5. On first boot the server auto-creates all tables (the database itself must already exist — Render Postgres creates it for you).
-6. Set `CLIENT_URL` to your Vercel frontend URL (e.g. `https://left2serve.vercel.app`) so CORS allows it.
+### Backend → Render (Blueprint Ready)
+
+The backend is a Node.js + Express API. It includes a `render.yaml` Blueprint which automates the setup.
+1. Push the repository to GitHub.
+2. Go to [Render Dashboard](https://dashboard.render.com/) and click **New > Blueprint**.
+3. Connect this repository. Render will read `backend/render.yaml` and automatically create:
+   - A Web Service (`left2serve-api`)
+   - A PostgreSQL Database (`left2serve-db`)
+4. **Environment Variables:** Render will prompt you or you can manually add the required secrets in the dashboard (see table below).
+   - *Note: `DATABASE_URL` is automatically injected by Render.*
+5. The `render.yaml` runs `npm install --include=dev && npm run build` to safely compile TypeScript before starting.
 
 ### Required Environment Variables
 
@@ -243,15 +250,16 @@ Notifications are generated automatically on reservation events (new request, ap
 |----------|:--------:|:-------:|-------|
 | `VITE_API_URL` | ✅ | — | Render backend URL; leave empty in dev |
 | `PORT` | — | ✅ | Auto-set by Render |
-| `NODE_ENV` | — | ✅ | Set to `production` |
-| `CLIENT_URL` | — | ✅ | Vercel frontend URL for CORS |
-| `DATABASE_URL` | — | ✅ | PostgreSQL connection string (injected when DB is linked on Render) |
-| `DB_SSL` | — | optional | `1` if the Postgres host requires SSL |
-| `JWT_SECRET` | — | ✅ | ≥ 16 chars, random |
+| `NODE_ENV` | — | ✅ | Set to `production` (Auto-set by Render) |
+| `CLIENT_URL` | — | ✅ | Vercel frontend URL for CORS (e.g. `https://left2serve.vercel.app`) |
+| `DATABASE_URL` | — | ✅ | PostgreSQL connection string (Auto-injected by Render) |
+| `DB_SSL` | — | optional | `1` if using external Postgres that requires SSL |
+| `JWT_SECRET` | — | ✅ | ≥ 16 chars, random string |
 | `ADMIN_CODE` | — | ✅ | Admin login code |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | — | ✅ | Image uploads (server returns 503 if not set) |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | — | ✅ | Online payments via Razorpay (COD still works if unset) |
 | `VITE_RAZORPAY_KEY_ID` | ✅ | — | Razorpay public key for the checkout |
+
 
 ## License
 

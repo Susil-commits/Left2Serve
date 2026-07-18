@@ -4,7 +4,7 @@ const BLOCKLIST = new Set([
   'left2serve', 'left2serve123', 'welcome123', 'letmein', 'iloveyou', 'admin123',
 ]);
 
-export function validatePassword(password) {
+export function validatePassword(password: string): { ok: boolean; error?: string } {
   const pw = String(password || '');
   if (pw.length < MIN_LENGTH) return { ok: false, error: `Password must be at least ${MIN_LENGTH} characters` };
   if (pw.length > 128) return { ok: false, error: 'Password is too long' };
@@ -18,7 +18,7 @@ export function validatePassword(password) {
   return { ok: true };
 }
 
-export function passwordStrength(password) {
+export function passwordStrength(password: string): { score: number; label: string } {
   const pw = String(password || '');
   let score = 0;
   if (pw.length >= MIN_LENGTH) score++;

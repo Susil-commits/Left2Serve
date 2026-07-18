@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import FoodCard from '../components/FoodCard';
 import Pagination from '../components/Pagination';
+import MapWrapper from '../components/MapWrapper';
 
 const categories = [
   { value: '', label: 'All', icon: '🌟' },
@@ -12,6 +13,8 @@ const categories = [
   { value: 'caterer', label: 'Caterers', icon: '🍱' },
   { value: 'household', label: 'Households', icon: '🏠' },
 ];
+
+const dietaryOptions = ['Vegan', 'Vegetarian', 'Halal', 'Gluten-Free', 'Nut-Free', 'Dairy-Free'];
 
 const sortOptions = [
   { value: 'newest', label: 'Newest First' },
@@ -30,8 +33,12 @@ export default function BrowseFood() {
   const [category, setCategory] = useState(searchParams.get('category') || '');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
+  const [distance, setDistance] = useState('');
+  const [location, setLocation] = useState(null); // {lat, lng}
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selectedDietary, setSelectedDietary] = useState([]);
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState('list');
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -42,13 +49,20 @@ export default function BrowseFood() {
     setLoading(true);
     setError('');
     try {
-      const data = await api.listings.getAll({
+      const params = {
         category: category || undefined,
         search: debouncedSearch || undefined,
+        dietary: selectedDietary.length > 0 ? selectedDietary.join(',') : undefined,
         sort,
         page,
         limit: LIMIT,
-      });
+      };
+      if (distance && location) {
+        params.distance = distance;
+        params.lat = location.lat;
+        params.lng = location.lng;
+      }
+      const data = await api.listings.getAll(params);
       setListings(data.listings);
       setPagination(data.pagination);
     } catch (err) {
@@ -56,7 +70,7 @@ export default function BrowseFood() {
       setListings([]);
     }
     setLoading(false);
-  }, [category, debouncedSearch, sort, page]);
+  }, [category, debouncedSearch, sort, page, distance, location, selectedDietary]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -65,6 +79,45 @@ export default function BrowseFood() {
 
   const changeCategory = (value) => { setCategory(value); setPage(1); };
   const changeSort = (value) => { setSort(value); setPage(1); };
+  
+  const toggleDietary = (tag) => {
+    setSelectedDietary(prev => {
+      const next = prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag];
+      setPage(1);
+      return next;
+    });
+  };
+
+  const handleDistanceChange = (e) => {
+    const val = e.target.value;
+    if (!val) {
+      setDistance('');
+      setLocation(null);
+      setPage(1);
+      return;
+    }
+    if (location) {
+      setDistance(val);
+      setPage(1);
+      return;
+    }
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setDistance(val);
+          setPage(1);
+        },
+        () => {
+          alert('Location access is required to filter by distance.');
+          setDistance('');
+        }
+      );
+    } else {
+      alert('Geolocation is not supported by this browser.');
+    }
+  };
+
   const clearSearch = () => { setSearch(''); setPage(1); };
   const changePage = (p) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
@@ -91,18 +144,42 @@ export default function BrowseFood() {
             </button>
           )}
         </div>
+        <select value={distance} onChange={handleDistanceChange} className="input-field select-field !w-auto !py-2 !px-4 !text-sm">
+          <option value="">Any Distance</option>
+          <option value="5">Within 5 km</option>
+          <option value="10">Within 10 km</option>
+          <option value="25">Within 25 km</option>
+          <option value="50">Within 50 km</option>
+        </select>
         <select value={sort} onChange={e => changeSort(e.target.value)} className="input-field select-field !w-auto !py-2 !px-4 !text-sm">
           {sortOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
+        <div className="flex bg-gray-100 rounded-xl p-1 shrink-0">
+          <button onClick={() => setViewMode('list')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-white text-accent shadow-sm' : 'text-subtle hover:text-text'}`}>List</button>
+          <button onClick={() => setViewMode('map')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${viewMode === 'map' ? 'bg-white text-accent shadow-sm' : 'text-subtle hover:text-text'}`}>Map</button>
+        </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap mb-8 animate-fade-in-up">
+      <div className="flex gap-2 flex-wrap mb-4 animate-fade-in-up">
         {categories.map(c => (
           <button key={c.value} onClick={() => changeCategory(c.value)}
             className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 ${
               category === c.value ? 'bg-accent text-white shadow-red scale-105' : 'bg-gray-50 text-subtle hover:bg-gray-100 hover:text-text border border-border hover:border-accent/20'
             }`}>
             <span>{c.icon}</span> {c.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2 flex-wrap mb-8 animate-fade-in-up">
+        {dietaryOptions.map(tag => (
+          <button type="button" key={tag} onClick={() => toggleDietary(tag)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+              selectedDietary.includes(tag) 
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm' 
+              : 'bg-white border-border text-subtle hover:border-emerald-200 hover:text-emerald-600'
+            }`}>
+            {tag}
           </button>
         ))}
       </div>
@@ -137,10 +214,16 @@ export default function BrowseFood() {
       ) : (
         <>
           <div className="text-xs text-muted mb-4 font-medium">{pagination.total} listing{pagination.total !== 1 ? 's' : ''} found{pagination.totalPages > 1 && ` · Page ${pagination.page} of ${pagination.totalPages}`}</div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {listings.map(l => <FoodCard key={l.id} listing={l} />)}
-          </div>
-          <Pagination page={pagination.page} pageCount={pagination.totalPages} onChange={changePage} />
+          {viewMode === 'map' ? (
+            <div className="h-[600px] w-full rounded-2xl overflow-hidden border border-border shadow-sm mb-4">
+              <MapWrapper listings={listings} />
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {listings.map(l => <FoodCard key={l.id} listing={l} />)}
+            </div>
+          )}
+          {viewMode === 'list' && <Pagination page={pagination.page} pageCount={pagination.totalPages} onChange={changePage} />}
         </>
       )}
     </div>

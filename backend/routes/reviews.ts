@@ -1,47 +1,54 @@
+import { Request, Response } from 'express';
 import { Router } from 'express';
 import { get, all, insert } from '../db/database.js';
 import { authMiddleware, optionalAuth } from '../middleware/auth.js';
+import { validateIdParam } from '../middleware/validateParam.js';
+import { z } from 'zod';
+import { validate } from '../middleware/validate.js';
 
 const router = Router();
 
-router.post('/', authMiddleware, async (req, res) => {
+const reviewSchema = z.object({
+  reservationId: z.preprocess((val) => Number(val), z.number().int().positive('reservationId is required')),
+  rating: z.preprocess((val) => Number(val), z.number().int().min(1, 'Rating must be between 1 and 5').max(5, 'Rating must be between 1 and 5')),
+  comment: z.string().max(500, 'Comment is too long (max 500 chars)').optional().nullable()
+});
+
+router.post('/', authMiddleware, validate(reviewSchema), async (req: Request, res: Response) => {
   const { reservationId, rating, comment } = req.body;
   const r = Number(rating);
-  if (!reservationId) return res.status(400).json({ error: 'reservationId is required' });
-  if (!Number.isInteger(r) || r < 1 || r > 5) return res.status(400).json({ error: 'Rating must be between 1 and 5' });
-  if (comment && String(comment).length > 500) return res.status(400).json({ error: 'Comment is too long (max 500 chars)' });
   try {
     const reservation = await get('SELECT * FROM reservations WHERE id = ?', [reservationId]);
     if (!reservation) return res.status(404).json({ error: 'Reservation not found' });
     const listing = await get('SELECT id, user_id, title FROM food_listings WHERE id = ?', [reservation.food_listing_id]);
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
-    const isDonor = listing.user_id === req.user.id;
-    const isReceiver = reservation.user_id === req.user.id;
+    const isDonor = listing.user_id === req.user!.id;
+    const isReceiver = reservation.user_id === req.user!.id;
     if (!isDonor && !isReceiver) return res.status(403).json({ error: 'Not authorized to review this reservation' });
     if (reservation.status !== 'collected') return res.status(400).json({ error: 'You can only review after the pickup is completed' });
     const revieweeId = isDonor ? reservation.user_id : listing.user_id;
-    if (revieweeId === req.user.id) return res.status(400).json({ error: 'You cannot review yourself' });
-    const existing = await get('SELECT id FROM reviews WHERE reservation_id = ? AND reviewer_id = ?', [reservationId, req.user.id]);
+    if (revieweeId === req.user!.id) return res.status(400).json({ error: 'You cannot review yourself' });
+    const existing = await get('SELECT id FROM reviews WHERE reservation_id = ? AND reviewer_id = ?', [reservationId, req.user!.id]);
     if (existing) return res.status(409).json({ error: 'You have already reviewed this reservation' });
     const id = await insert(
       'INSERT INTO reviews (reservation_id, listing_id, reviewer_id, reviewee_id, rating, comment) VALUES (?, ?, ?, ?, ?, ?)',
-      [reservationId, listing.id, req.user.id, revieweeId, r, comment ? String(comment).trim().slice(0, 500) : null]
+      [reservationId, listing.id, req.user!.id, revieweeId, r, comment ? String(comment).trim().slice(0, 500) : null]
     );
     const review = await get('SELECT * FROM reviews WHERE id = ?', [id]);
     res.status(201).json(review);
   } catch (err) { res.status(500).json({ error: 'Failed to submit review' }); }
 });
 
-router.get('/reservation/:id', authMiddleware, async (req, res) => {
+router.get('/reservation/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response) => {
   try {
     const reservation = await get('SELECT * FROM reservations WHERE id = ?', [req.params.id]);
     if (!reservation) return res.status(404).json({ error: 'Reservation not found' });
     const listing = await get('SELECT id, user_id, title FROM food_listings WHERE id = ?', [reservation.food_listing_id]);
     if (!listing) return res.json({ canReview: false, myReview: null });
-    const isDonor = listing.user_id === req.user.id;
-    const isReceiver = reservation.user_id === req.user.id;
+    const isDonor = listing.user_id === req.user!.id;
+    const isReceiver = reservation.user_id === req.user!.id;
     if (!isDonor && !isReceiver) return res.json({ canReview: false, myReview: null });
-    const myReview = await get('SELECT * FROM reviews WHERE reservation_id = ? AND reviewer_id = ?', [reservation.id, req.user.id]);
+    const myReview = await get('SELECT * FROM reviews WHERE reservation_id = ? AND reviewer_id = ?', [reservation.id, req.user!.id]);
     const revieweeId = isDonor ? reservation.user_id : listing.user_id;
     const reviewee = await get('SELECT name, organization, role FROM users WHERE id = ?', [revieweeId]);
     const canReview = reservation.status === 'collected' && !myReview;
@@ -49,7 +56,7 @@ router.get('/reservation/:id', authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Failed to fetch review status' }); }
 });
 
-router.get('/user/:userId', optionalAuth, async (req, res) => {
+router.get('/user/:userId', optionalAuth, validateIdParam('userId'), async (req: Request, res: Response) => {
   try {
     const userId = Number(req.params.userId);
     if (!Number.isFinite(userId) || userId <= 0) return res.json({ average: 0, count: 0, reviews: [] });

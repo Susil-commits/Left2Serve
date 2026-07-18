@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../components/AuthContext';
 import ImageUpload from '../components/ImageUpload';
 import { useToast } from '../components/Toast';
+import MapWrapper from '../components/MapWrapper';
 
 const categories = [
   { value: 'event', label: 'Event', icon: '🎉' },
@@ -12,6 +13,8 @@ const categories = [
   { value: 'caterer', label: 'Caterer', icon: '🍱' },
   { value: 'household', label: 'Household', icon: '🏠' },
 ];
+
+const dietaryOptions = ['Vegan', 'Vegetarian', 'Halal', 'Gluten-Free', 'Nut-Free', 'Dairy-Free'];
 
 export default function EditFood() {
   const { id } = useParams();
@@ -22,6 +25,7 @@ export default function EditFood() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [position, setPosition] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -43,8 +47,10 @@ export default function EditFood() {
           pickup_address: listing.pickup_address || '',
           pickup_instructions: listing.pickup_instructions || '',
           image_urls: listing.image_urls || [],
+          dietary_preferences: listing.dietary_preferences || [],
           status: listing.status || 'available',
         });
+        if (listing.latitude && listing.longitude) setPosition([listing.latitude, listing.longitude]);
       } catch {
         setError('Listing not found');
       }
@@ -53,6 +59,14 @@ export default function EditFood() {
   }, [id, user, navigate, addToast]);
 
   const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+  const toggleDietary = (tag) => {
+    setForm(prev => ({
+      ...prev,
+      dietary_preferences: prev.dietary_preferences.includes(tag) 
+        ? prev.dietary_preferences.filter(t => t !== tag) 
+        : [...prev.dietary_preferences, tag]
+    }));
+  };
   const [nowLocal] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
   const isFormValid = form.title && form.category && form.quantity && form.expiry_date && form.pickup_address;
 
@@ -61,7 +75,13 @@ export default function EditFood() {
     setSaving(true);
     setError('');
     try {
-      await api.listings.update(id, { ...form, quantity: parseInt(form.quantity), price: parseFloat(form.price) || 0 });
+      await api.listings.update(id, { 
+        ...form, 
+        quantity: parseInt(form.quantity), 
+        price: parseFloat(form.price) || 0,
+        latitude: position ? position[0] : null,
+        longitude: position ? position[1] : null
+      });
       addToast('Listing updated successfully', 'success');
       navigate('/dashboard');
     } catch (err) {
@@ -139,6 +159,21 @@ export default function EditFood() {
               </div>
             </div>
           </div>
+          <div>
+            <label className="block text-sm font-semibold text-text mb-2">Dietary Preferences</label>
+            <div className="flex flex-wrap gap-2">
+              {dietaryOptions.map(tag => (
+                <button type="button" key={tag} onClick={() => toggleDietary(tag)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                    form.dietary_preferences.includes(tag) 
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm' 
+                    : 'bg-white border-border text-subtle hover:border-emerald-200 hover:text-emerald-600'
+                  }`}>
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-text mb-2">Price</label>
@@ -168,6 +203,18 @@ export default function EditFood() {
           <div>
             <label className="block text-sm font-semibold text-text mb-2">Address</label>
             <input type="text" value={form.pickup_address} onChange={update('pickup_address')} required className="input-field" />
+          </div>
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-semibold text-text">Pinpoint Location</label>
+              <button type="button" onClick={() => {
+                if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p => setPosition([p.coords.latitude, p.coords.longitude]))
+              }} className="text-xs text-blue-600 hover:underline">Use Current Location</button>
+            </div>
+            <div className="h-48 rounded-xl overflow-hidden border border-border">
+              <MapWrapper pickerMode={true} position={position} setPosition={setPosition} />
+            </div>
+            <p className="text-xs text-subtle mt-1">Click on the map to set the exact coordinates for the interactive map.</p>
           </div>
           <div>
             <label className="block text-sm font-semibold text-text mb-2">Instructions</label>

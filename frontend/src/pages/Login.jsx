@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
+import { API_BASE_URL, api } from '../api';
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -21,6 +22,8 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMsg] = useState(isRegistered ? 'Account created successfully! Please sign in.' : (isExpired ? 'Your session has expired. Please sign in again.' : ''));
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState('');
   const { login, adminLogin } = useAuth();
   const navigate = useNavigate();
 
@@ -45,6 +48,21 @@ export default function Login() {
     try {
       await adminLogin(adminCode);
       navigate('/admin/dashboard');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setForgotMsg('');
+    setLoading(true);
+    try {
+      const data = await api.auth.forgotPassword({ email });
+      setForgotMsg(data.message || 'If that email exists, a reset link has been sent.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -118,27 +136,52 @@ export default function Login() {
           )}
 
           {mode === 'user' ? (
-            <form onSubmit={handleUserSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-text mb-2">Email address</label>
-                <div className="relative">
-                  <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="input-field pl-14" placeholder="you@example.com" />
+            forgotPasswordMode ? (
+              <form onSubmit={handleForgotSubmit} className="space-y-4">
+                {forgotMsg && (
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-2xl mb-4 text-sm flex items-start gap-3 font-medium">
+                    <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    {forgotMsg}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-semibold text-text mb-2">Email address</label>
+                  <div className="relative">
+                    <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="input-field pl-14" placeholder="you@example.com" />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-text mb-2">Password</label>
-                <div className="relative">
-                  <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="input-field pl-14" placeholder="Enter your password" />
+                <button type="submit" disabled={loading} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect">
+                  {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending...</span> : 'Send Reset Link'}
+                </button>
+                <p className="text-center text-sm text-muted pt-2"><button type="button" onClick={() => { setForgotPasswordMode(false); setForgotMsg(''); setError(''); }} className="text-accent hover:text-accent-dark font-semibold transition-colors">Back to sign in</button></p>
+              </form>
+            ) : (
+              <form onSubmit={handleUserSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-text mb-2">Email address</label>
+                  <div className="relative">
+                    <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="input-field pl-14" placeholder="you@example.com" />
+                  </div>
                 </div>
-              </div>
-              <button type="submit" disabled={loading} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect">
-                {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Signing in...</span> : 'Sign In'}
-              </button>
-              <p className="text-center text-sm text-muted pt-2">Don't have an account? <Link to="/register" className="text-accent hover:text-accent-dark font-semibold transition-colors">Create one</Link></p>
-              <p className="text-center text-xs text-muted"><Link to="/" className="hover:text-accent transition-colors">← Back to home</Link></p>
-            </form>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-semibold text-text">Password</label>
+                    <button type="button" onClick={() => { setForgotPasswordMode(true); setError(''); }} className="text-xs text-accent hover:text-accent-dark font-semibold transition-colors">Forgot password?</button>
+                  </div>
+                  <div className="relative">
+                    <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="input-field pl-14" placeholder="Enter your password" />
+                  </div>
+                </div>
+                <button type="submit" disabled={loading} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect">
+                  {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Signing in...</span> : 'Sign In'}
+                </button>
+                <p className="text-center text-sm text-muted pt-2">Don't have an account? <Link to="/register" className="text-accent hover:text-accent-dark font-semibold transition-colors">Create one</Link></p>
+                <p className="text-center text-xs text-muted"><Link to="/" className="hover:text-accent transition-colors">← Back to home</Link></p>
+              </form>
+            )
           ) : (
             <form onSubmit={handleAdminSubmit} className="space-y-4">
               <div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import ImageUpload from '../components/ImageUpload';
 import { useToast } from '../components/Toast';
+import MapWrapper from '../components/MapWrapper';
 
 const categories = [
   { value: 'event', label: 'Event', icon: '🎉' },
@@ -12,16 +13,29 @@ const categories = [
   { value: 'household', label: 'Household', icon: '🏠' },
 ];
 
+const dietaryOptions = ['Vegan', 'Vegetarian', 'Halal', 'Gluten-Free', 'Nut-Free', 'Dairy-Free'];
+
 export default function ListFood() {
   const [form, setForm] = useState({
     title: '', description: '', category: 'restaurant', quantity: '', unit: 'servings',
-    price: '0', expiry_date: '', pickup_address: '', pickup_instructions: '', image_urls: []
+    price: '0', expiry_date: '', pickup_address: '', pickup_instructions: '', image_urls: [], dietary_preferences: []
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [position, setPosition] = useState(null);
   const navigate = useNavigate();
   const { addToast } = useToast();
   const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+  
+  const toggleDietary = (tag) => {
+    setForm(prev => ({
+      ...prev,
+      dietary_preferences: prev.dietary_preferences.includes(tag) 
+        ? prev.dietary_preferences.filter(t => t !== tag) 
+        : [...prev.dietary_preferences, tag]
+    }));
+  };
+
   const [nowLocal] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
 
   const handleSubmit = async (e) => {
@@ -29,7 +43,13 @@ export default function ListFood() {
     setLoading(true);
     setError('');
     try {
-      await api.listings.create({ ...form, quantity: parseInt(form.quantity), price: parseFloat(form.price) || 0 });
+      await api.listings.create({ 
+        ...form, 
+        quantity: parseInt(form.quantity), 
+        price: parseFloat(form.price) || 0,
+        latitude: position ? position[0] : null,
+        longitude: position ? position[1] : null
+      });
       addToast('Food listing published successfully', 'success');
       navigate('/dashboard');
     } catch (err) {
@@ -96,6 +116,21 @@ export default function ListFood() {
             </div>
           </div>
           <div>
+            <label className="block text-sm font-semibold text-text mb-2">Dietary Preferences</label>
+            <div className="flex flex-wrap gap-2">
+              {dietaryOptions.map(tag => (
+                <button type="button" key={tag} onClick={() => toggleDietary(tag)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                    form.dietary_preferences.includes(tag) 
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm' 
+                    : 'bg-white border-border text-subtle hover:border-emerald-200 hover:text-emerald-600'
+                  }`}>
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
             <label className="block text-sm font-semibold text-text mb-2">Price</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted text-sm font-semibold">$</span>
@@ -115,6 +150,18 @@ export default function ListFood() {
           <div>
             <label className="block text-sm font-semibold text-text mb-2">Address <span className="text-accent">*</span></label>
             <input type="text" value={form.pickup_address} onChange={update('pickup_address')} required className="input-field" placeholder="Full address including city and zip code" />
+          </div>
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-semibold text-text">Pinpoint Location</label>
+              <button type="button" onClick={() => {
+                if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p => setPosition([p.coords.latitude, p.coords.longitude]))
+              }} className="text-xs text-blue-600 hover:underline">Use Current Location</button>
+            </div>
+            <div className="h-48 rounded-xl overflow-hidden border border-border">
+              <MapWrapper pickerMode={true} position={position} setPosition={setPosition} />
+            </div>
+            <p className="text-xs text-subtle mt-1">Click on the map to set the exact coordinates for the interactive map.</p>
           </div>
           <div>
             <label className="block text-sm font-semibold text-text mb-2">Instructions</label>

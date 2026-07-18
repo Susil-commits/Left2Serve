@@ -211,6 +211,17 @@ export default function FoodDetail() {
             </div>
           )}
 
+          {listing.dietary_preferences && listing.dietary_preferences.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-subtle mb-2 uppercase tracking-wider">Dietary Preferences</h3>
+              <div className="flex flex-wrap gap-2">
+                {listing.dietary_preferences.map(tag => (
+                  <span key={tag} className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-wider">{tag}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mb-6 p-5 bg-gray-50 rounded-2xl border border-border">
             <h3 className="text-sm font-semibold text-subtle mb-3 uppercase tracking-wider">Pickup Details</h3>
             <div className="flex items-start gap-3">

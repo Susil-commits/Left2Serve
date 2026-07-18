@@ -1,3 +1,4 @@
+import { Request, Response } from 'express';
 import { Router } from 'express';
 import crypto from 'crypto';
 import { get, all, run, insert } from '../db/database.js';
@@ -8,7 +9,7 @@ import { getAvailability, recomputeListingStatus } from '../db/availability.js';
 const router = Router();
 
 const KEY_ID = process.env.RAZORPAY_KEY_ID;
-const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+const KEY_SECRET = (process.env.RAZORPAY_KEY_SECRET as string);
 const RAZORPAY_CONFIGURED = !!(KEY_ID && KEY_SECRET);
 const RAZORPAY_API = 'https://api.razorpay.com/v1';
 
@@ -39,11 +40,11 @@ function verifySignature(orderId, paymentId, signature) {
   }
 }
 
-router.post('/config', (req, res) => {
+router.post('/config', (req: Request, res: Response) => {
   res.json({ configured: RAZORPAY_CONFIGURED, key_id: RAZORPAY_CONFIGURED ? KEY_ID : null });
 });
 
-router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'), async (req, res) => {
+router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'), async (req: Request, res: Response) => {
   if (!RAZORPAY_CONFIGURED) return res.status(503).json({ error: 'Razorpay is not configured on the server' });
   const { food_listing_id, quantity, pickup_time, notes } = req.body;
   if (!food_listing_id || !quantity) return res.status(400).json({ error: 'food_listing_id and quantity are required' });
@@ -59,23 +60,23 @@ router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'),
     if (qty > remaining) return res.status(400).json({ error: `Only ${remaining} ${listing.unit} available` });
     const price = Number(listing.price) || 0;
     if (price <= 0) return res.status(400).json({ error: 'This listing is free and does not need online payment' });
-    const [existing] = await all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('pending','approved')", [food_listing_id, req.user.id]);
+    const [existing] = await all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('pending','approved')", [food_listing_id, req.user!.id]);
     if (existing) return res.status(409).json({ error: 'You already have an active reservation for this listing' });
 
     const amountRupees = Math.round(price * qty * 100) / 100;
     const amountPaise = Math.round(price * qty * 100);
 
     let order;
-    try { order = await createRazorpayOrder(amountPaise, `l2s_${req.user.id}_${Date.now()}`); }
+    try { order = await createRazorpayOrder(amountPaise, `l2s_${req.user!.id}_${Date.now()}`); }
     catch (e) { return res.status(502).json({ error: e.message || 'Failed to create payment order' }); }
 
     const id = await insert(
       'INSERT INTO reservations (food_listing_id, user_id, quantity, pickup_time, notes, payment_method, payment_status, amount, razorpay_order_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [food_listing_id, req.user.id, qty, pickup_time || null, notes || null, 'razorpay', 'pending', amountRupees, order.id]
+      [food_listing_id, req.user!.id, qty, pickup_time || null, notes || null, 'razorpay', 'pending', amountRupees, order.id]
     );
     await recomputeListingStatus(food_listing_id);
     const reservation = await get('SELECT * FROM reservations WHERE id = ?', [id]);
-    const reserver = await get('SELECT name, email, phone FROM users WHERE id = ?', [req.user.id]);
+    const reserver = await get('SELECT name, email, phone FROM users WHERE id = ?', [req.user!.id]);
     await createNotification(
       listing.user_id,
       'reservation_new',
@@ -100,14 +101,14 @@ router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'),
   }
 });
 
-router.post('/verify', authMiddleware, roleMiddleware('ngo', 'volunteer'), async (req, res) => {
+router.post('/verify', authMiddleware, roleMiddleware('ngo', 'volunteer'), async (req: Request, res: Response) => {
   if (!RAZORPAY_CONFIGURED) return res.status(503).json({ error: 'Razorpay is not configured on the server' });
   const { reservation_id, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
   if (!reservation_id || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) return res.status(400).json({ error: 'Missing payment verification details' });
   try {
     const reservation = await get('SELECT * FROM reservations WHERE id = ?', [reservation_id]);
     if (!reservation) return res.status(404).json({ error: 'Reservation not found' });
-    if (reservation.user_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
+    if (reservation.user_id !== req.user!.id) return res.status(403).json({ error: 'Not authorized' });
     if (reservation.payment_method !== 'razorpay') return res.status(400).json({ error: 'This reservation is not a Razorpay payment' });
     if (reservation.razorpay_order_id !== razorpay_order_id) return res.status(400).json({ error: 'Order ID mismatch' });
     if (reservation.payment_status === 'paid') return res.json({ success: true, reservation, message: 'Payment already verified' });

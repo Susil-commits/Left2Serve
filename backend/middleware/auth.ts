@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { Request, Response, NextFunction } from 'express';
 import { get } from '../db/database.js';
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
@@ -8,21 +9,27 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
 
 const SECRET = process.env.JWT_SECRET;
 
-async function verifyToken(token) {
-  const decoded = jwt.verify(token, SECRET);
+interface DecodedToken {
+  id: number;
+  role: string;
+  tv?: number;
+}
+
+async function verifyToken(token: string): Promise<DecodedToken> {
+  const decoded = jwt.verify(token, SECRET as string) as any;
   if (!decoded || typeof decoded.id !== 'number') throw new Error('bad token');
   if (decoded.role === 'admin') {
     if (decoded.id !== 0) throw new Error('bad admin token');
-    return decoded;
+    return { id: decoded.id, role: decoded.role, tv: decoded.tv };
   }
   const user = await get('SELECT token_version, is_active FROM users WHERE id = ?', [decoded.id]);
   if (!user) throw new Error('user gone');
   if (!user.is_active) throw new Error('suspended');
   if (Number(decoded.tv || 0) !== Number(user.token_version || 0)) throw new Error('token revoked');
-  return decoded;
+  return { id: decoded.id, role: decoded.role, tv: decoded.tv };
 }
 
-export async function authMiddleware(req, res, next) {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ error: 'No token provided' });
   try {
@@ -33,7 +40,7 @@ export async function authMiddleware(req, res, next) {
   }
 }
 
-export async function optionalAuth(req, res, next) {
+export async function optionalAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (header && header.startsWith('Bearer ')) {
     try { req.user = await verifyToken(header.split(' ')[1]); }
@@ -42,8 +49,8 @@ export async function optionalAuth(req, res, next) {
   next();
 }
 
-export function roleMiddleware(...roles) {
-  return (req, res, next) => {
+export function roleMiddleware(...roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user || !roles.includes(req.user.role)) return res.status(403).json({ error: 'Insufficient permissions' });
     next();
   };
