@@ -132,7 +132,7 @@ export default function NotificationBell() {
               <div className="p-10 text-center">
                 <div className="text-4xl mb-3 opacity-20">🔕</div>
                 <p className="text-subtle text-sm font-medium">No notifications yet</p>
-                <p className="text-muted text-xs mt-1">Reservation updates will appear here</p>
+                <p className="text-subtle text-xs mt-1">Reservation updates will appear here</p>
               </div>
             ) : (
               items.map((n) => (
@@ -145,10 +145,10 @@ export default function NotificationBell() {
                       {!n.is_read && <span className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />}
                     </div>
                     <p className="text-xs text-subtle line-clamp-2 mt-0.5">{n.message}</p>
-                    <span className="text-[10px] text-muted mt-1 block">{timeAgo(n.created_at)}</span>
+                    <span className="text-[10px] text-subtle mt-1 block">{timeAgo(n.created_at)}</span>
                   </div>
                   <span onClick={(e) => handleDelete(e, n.id)} role="button" aria-label="Delete notification"
-                    className="self-start opacity-0 group-hover:opacity-100 text-muted hover:text-red-500 transition-all flex-shrink-0 p-1 -m-1 cursor-pointer">
+                    className="self-start opacity-0 group-hover:opacity-100 text-subtle hover:text-red-500 transition-all flex-shrink-0 p-1 -m-1 cursor-pointer">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </span>
                 </button>

@@ -24,6 +24,12 @@ async function request(endpoint, options = {}) {
     localStorage.removeItem('token');
     window.dispatchEvent(new CustomEvent('auth:expired'));
   }
+  
+  const contentType = res.headers.get('content-type');
+  if (contentType && contentType.includes('text/html')) {
+    throw new Error('API returned HTML instead of JSON. Ensure VITE_API_URL is correctly set.');
+  }
+
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;

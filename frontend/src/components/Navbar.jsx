@@ -62,7 +62,7 @@ export default function Navbar() {
               {user ? (
                 <div className="flex items-center gap-3 ml-4 pl-4 border-l border-border">
                   <Link to="/profile" aria-label="View profile" className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent text-xs font-bold shadow-sm group-hover-scale hover:ring-2 hover:ring-accent/20 transition-all overflow-hidden">
-                    {user.avatar_url ? <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" /> : user.name[0]}
+                    {user.avatar_url ? <img src={user.avatar_url} alt={user.name} width="32" height="32" loading="lazy" className="w-full h-full object-cover" /> : user.name[0]}
                   </Link>
                   <div className="hidden lg:block">
                     <div className="text-sm font-semibold text-text leading-tight">{user.name}</div>

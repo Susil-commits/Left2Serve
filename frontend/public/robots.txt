@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://left2-serve.vercel.app/sitemap.xml
