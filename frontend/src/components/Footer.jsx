@@ -13,23 +13,23 @@ export default function Footer() {
             <p className="text-white/50 text-sm leading-relaxed">Connecting surplus food with communities in need.</p>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-3 text-sm">Platform</h4>
+            <h2 className="font-semibold text-white mb-3 text-sm">Platform</h2>
             <div className="space-y-2 text-white/50 text-sm">
-              <div><Link to="/browse" className="hover:text-white transition-colors">Browse Food</Link></div>
-              <div><Link to="/register" className="hover:text-white transition-colors">Join Us</Link></div>
-              <div><Link to="/login" className="hover:text-white transition-colors">Sign In</Link></div>
+              <div><Link to="/browse" className="hover:text-white transition-colors underline">Browse Food</Link></div>
+              <div><Link to="/register" className="hover:text-white transition-colors underline">Join Us</Link></div>
+              <div><Link to="/login" className="hover:text-white transition-colors underline">Sign In</Link></div>
             </div>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-3 text-sm">Company</h4>
+            <h2 className="font-semibold text-white mb-3 text-sm">Company</h2>
             <div className="space-y-2 text-white/50 text-sm">
-              <div><Link to="/" className="hover:text-white transition-colors">Home</Link></div>
-              <div><Link to="/browse" className="hover:text-white transition-colors">Browse</Link></div>
-              <div><Link to="/register" className="hover:text-white transition-colors">Join</Link></div>
+              <div><Link to="/" className="hover:text-white transition-colors underline">Home</Link></div>
+              <div><Link to="/browse" className="hover:text-white transition-colors underline">Browse</Link></div>
+              <div><Link to="/register" className="hover:text-white transition-colors underline">Join</Link></div>
             </div>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-3 text-sm">Contact</h4>
+            <h2 className="font-semibold text-white mb-3 text-sm">Contact</h2>
             <div className="space-y-2 text-white/50 text-sm">
               <div>hello@left2serve.org</div>
             </div>

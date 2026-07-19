@@ -1,14 +1,13 @@
 # Left2Serve
-
-Left2Serve connects surplus food donors with NGOs, shelters, and volunteers to reduce food waste and feed communities.
+> Left2Serve connects surplus food donors with NGOs, shelters, and volunteers to reduce food waste and feed communities.
 
 ## Features
-- Browse surplus food listings by category (Events, Restaurants, Hotels, Caterers, Households).
-- Interactive map to find food near you.
-- Real-time notifications for reservations and collections.
-- Community forum to connect and share tips.
 
-## Usage
-Users can register as Donors (who post food), NGOs, or Volunteers (who claim and collect food).
+- [Browse Food](/browse): Browse surplus food listings by category.
+- [Impact](/impact): View community impact.
+- [Community](/forum): Community forum to connect and share tips.
+- [Dashboard](/dashboard): Real-time notifications for reservations and collections.
 
-This site is AI-agent friendly.
+## About
+
+Users can register as Donors (who post food), NGOs, or Volunteers (who claim and collect food). This site is AI-agent friendly and fully browsable.
