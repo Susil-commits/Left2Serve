@@ -71,9 +71,27 @@ export default function Home() {
   useScrollReveal();
   const [openFaq, setOpenFaq] = useState(null);
   const [stats, setStats] = useState({ mealsSaved: 0, totalDonors: 0, totalReceivers: 0, activeListings: 0 });
+  const [showNotice, setShowNotice] = useState(false);
+  const [serverAwake, setServerAwake] = useState(false);
 
   useEffect(() => {
-    api.listings.getStats().then(setStats).catch(() => {});
+    let isFast = true;
+    const noticeTimeout = setTimeout(() => {
+      isFast = false;
+      setShowNotice(true);
+    }, 1500); // Delay showing to avoid impacting initial render (FCP/LCP)
+
+    api.listings.getStats().then((data) => {
+      setStats(data);
+      setServerAwake(true);
+      if (isFast) {
+        clearTimeout(noticeTimeout); // Never show if it loaded quickly
+      } else {
+        setTimeout(() => setShowNotice(false), 5000); // Hide 5 seconds after waking up
+      }
+    }).catch(() => {});
+
+    return () => clearTimeout(noticeTimeout);
   }, []);
 
   return (
@@ -217,6 +235,35 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Free Tier Notice Popup */}
+      {showNotice && (
+        <div role="status" aria-live="polite" className="fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-auto sm:right-6 z-50 premium-card p-4 sm:p-5 sm:max-w-[320px] shadow-2xl border border-accent/20 transition-all duration-500">
+          <div className="flex justify-between items-start mb-2">
+            <div className="flex items-center gap-2">
+              {!serverAwake ? (
+                <span className="relative flex h-3 w-3" aria-hidden="true">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
+                </span>
+              ) : (
+                <span className="text-green-500 text-sm" aria-hidden="true">✓</span>
+              )}
+              <h4 className="font-bold text-text text-sm">
+                {!serverAwake ? "Server Waking Up..." : "Server is Awake!"}
+              </h4>
+            </div>
+            <button onClick={() => setShowNotice(false)} aria-label="Dismiss notice" className="text-subtle hover:text-text transition-colors p-1 rounded-full hover:bg-surface">
+              <svg className="w-4 h-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <p className="text-xs text-subtle leading-relaxed">
+            {!serverAwake 
+              ? "Our backend is hosted on a free tier. It may take ~50 seconds to wake up from inactivity. If impact counts are 0, please give it a moment!"
+              : "Live data has been successfully loaded."}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
