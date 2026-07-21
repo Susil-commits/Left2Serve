@@ -1,0 +1,22 @@
+config:
+  target: "https://left2serve.onrender.com"
+  phases:
+    - duration: 30
+      arrivalRate: 50
+      name: "Phase 1: 50 VUs"
+    - duration: 30
+      arrivalRate: 100
+      name: "Phase 2: 100 VUs"
+    - duration: 30
+      arrivalRate: 200
+      name: "Phase 3: 200 VUs"
+  environments:
+    production:
+      target: "https://left2serve.onrender.com"
+scenarios:
+  - name: "Health check and listings fetch"
+    flow:
+      - get:
+          url: "/api/health"
+      - get:
+          url: "/api/listings"

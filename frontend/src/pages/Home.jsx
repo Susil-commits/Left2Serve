@@ -117,6 +117,26 @@ export default function Home() {
                 <AnimatedStat value={stats.totalDonors} label="Active Donors" />
                 <AnimatedStat value={stats.totalReceivers} label="Receivers" />
               </div>
+              
+              {showNotice && !serverAwake && (
+                <div role="status" aria-live="polite" className="mt-8 p-4 rounded-2xl bg-gradient-to-r from-accent/[0.08] to-transparent border border-accent/20 backdrop-blur-md relative overflow-hidden flex items-start gap-4 shadow-sm animate-fade-in">
+                  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-accent"></div>
+                  <div className="flex-shrink-0 mt-0.5">
+                    <span className="relative flex h-3.5 w-3.5" aria-hidden="true">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-accent"></span>
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-text text-sm mb-1 flex items-center gap-2">
+                      Connecting to Database <span className="text-[10px] font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20 uppercase tracking-wider">Free Tier</span>
+                    </h4>
+                    <p className="text-xs text-subtle leading-relaxed max-w-sm">
+                      Our backend is waking up from inactivity. It may take a few moments. Statistics will update automatically once live.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="reveal-right relative flex justify-center">
               <div className="relative w-80 h-80 lg:w-96 lg:h-96">
@@ -236,34 +256,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Free Tier Notice Popup */}
-      {showNotice && (
-        <div role="status" aria-live="polite" className="fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-auto sm:right-6 z-50 premium-card p-4 sm:p-5 sm:max-w-[320px] shadow-2xl border border-accent/20 transition-all duration-500">
-          <div className="flex justify-between items-start mb-2">
-            <div className="flex items-center gap-2">
-              {!serverAwake ? (
-                <span className="relative flex h-3 w-3" aria-hidden="true">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
-                </span>
-              ) : (
-                <span className="text-green-500 text-sm" aria-hidden="true">✓</span>
-              )}
-              <h4 className="font-bold text-text text-sm">
-                {!serverAwake ? "Server Waking Up..." : "Server is Awake!"}
-              </h4>
-            </div>
-            <button onClick={() => setShowNotice(false)} aria-label="Dismiss notice" className="text-subtle hover:text-text transition-colors p-1 rounded-full hover:bg-surface">
-              <svg className="w-4 h-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-          <p className="text-xs text-subtle leading-relaxed">
-            {!serverAwake 
-              ? "Our backend is hosted on a free tier. It may take ~50 seconds to wake up from inactivity. If impact counts are 0, please give it a moment!"
-              : "Live data has been successfully loaded."}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
