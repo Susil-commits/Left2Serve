@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import 'express-async-errors';
 import express from 'express';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
@@ -12,6 +13,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import initializeDb from './db/init.js';
 import { sweepExpiredListings } from './db/expire.js';
+import { setupCronJobs } from './utils/cron.js';
 import authRoutes from './routes/auth.js';
 import listingRoutes from './routes/listings.js';
 import reservationRoutes from './routes/reservations.js';
@@ -22,6 +24,9 @@ import reviewRoutes from './routes/reviews.js';
 import chatRoutes from './routes/chat.js';
 import watchlistsRoutes from './routes/watchlists.js';
 import forumRoutes from './routes/forum.js';
+import { v4 as uuidv4 } from 'uuid';
+import { xssClean } from './middleware/xss.js';
+import { errorHandler } from './middleware/errorHandler.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
@@ -49,10 +54,27 @@ app.use(helmet({
     crossOriginOpenerPolicy: { policy: 'same-origin' },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     strictTransportSecurity: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
-    contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], frameAncestors: ["'none'"], baseUri: ["'self'"] } },
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+            connectSrc: ["'self'", "http://localhost:*", "ws://localhost:*", "wss://*"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            frameAncestors: ["'none'"],
+            baseUri: ["'self'"]
+        }
+    },
 }));
 app.use(cors({ origin: corsOrigin, credentials: true, maxAge: 86400 }));
 app.use(express.json({ limit: '1mb' }));
+// Inject Request ID
+app.use((req, res, next) => {
+    req.reqId = uuidv4();
+    next();
+});
+// XSS Sanitization
+app.use(xssClean);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(morgan(isProduction ? 'combined' : 'dev'));
 const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests, please try again later' } });
@@ -73,20 +95,7 @@ app.use('/api/watchlists', watchlistsRoutes);
 app.use('/api/forum', forumRoutes);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use((req, res) => { res.status(404).json({ error: 'Not found' }); });
-// eslint-disable-next-line no-unused-vars
-app.use((err, req, res, next) => {
-    if (err?.type === 'entity.parse.failed' || err?.type === 'entity.too.large')
-        return res.status(400).json({ error: 'Invalid or too large request body' });
-    if (err?.message?.startsWith('CORS blocked'))
-        return res.status(403).json({ error: 'Not allowed by CORS' });
-    if (!isProduction) {
-        console.error('Unhandled error:', err);
-    }
-    else {
-        console.error('Unhandled error:', err.message);
-    }
-    res.status(500).json({ error: 'Internal server error' });
-});
+app.use(errorHandler);
 export const io = new SocketIOServer(server, {
     cors: {
         origin: Array.from(allowedOrigins),
@@ -112,8 +121,10 @@ io.on('connection', (socket) => {
     }
     socket.on('join_reservation', async (reservationId) => {
         const rId = Number(reservationId);
-        if (isNaN(rId))
+        if (!Number.isInteger(rId) || rId <= 0) {
+            socket.emit('error', 'Invalid reservation ID');
             return;
+        }
         const reservation = await get('SELECT * FROM reservations WHERE id = ?', [rId]);
         if (!reservation)
             return;
@@ -130,8 +141,14 @@ io.on('connection', (socket) => {
         if (!content || !reservationId)
             return;
         const rId = Number(reservationId);
-        if (!socket.rooms.has(`reservation_${rId}`))
+        if (!Number.isInteger(rId) || rId <= 0) {
+            socket.emit('error', 'Invalid reservation ID');
             return;
+        }
+        if (!socket.rooms.has(`reservation_${rId}`)) {
+            socket.emit('error', 'You must join the reservation chat first');
+            return;
+        }
         try {
             const id = await insert('INSERT INTO messages (reservation_id, sender_id, content) VALUES (?, ?, ?)', [rId, socket.data.user.id, content]);
             const user = await get('SELECT name FROM users WHERE id = ?', [socket.data.user.id]);
@@ -146,13 +163,14 @@ io.on('connection', (socket) => {
         }
         catch (err) {
             console.error('Failed to send message:', err);
+            socket.emit('error', 'Failed to send message');
         }
     });
 });
 const PORT = process.env.PORT || 5000;
 initializeDb().then(async () => {
     await sweepExpiredListings();
-    setInterval(sweepExpiredListings, 5 * 60 * 1000);
+    setupCronJobs();
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }).catch((err) => {
     console.error('FATAL: Failed to start server:\n' + (err.message || err));

@@ -1,0 +1,48 @@
+{
+  "navbar": {
+    "dashboard": "Dashboard",
+    "browse_food": "Browse Food",
+    "forum": "Forum",
+    "impact": "Impact",
+    "saved": "Saved",
+    "list_food": "List Food",
+    "login": "Log in",
+    "sign_up": "Sign up",
+    "profile": "Profile",
+    "logout": "Log out"
+  },
+  "hero": {
+    "title": "Turn Surplus Into Smiles",
+    "subtitle": "Join thousands of restaurants, hotels, and individuals preventing food waste and feeding communities.",
+    "cta_donate": "Donate Food",
+    "cta_browse": "Browse Listings"
+  },
+  "home": {
+    "how_it_works": "How It Works",
+    "step1_title": "List Surplus Food",
+    "step1_desc": "Donors easily list excess high-quality food from events or restaurants.",
+    "step2_title": "Find & Reserve",
+    "step2_desc": "NGOs and individuals browse local listings and reserve what they need.",
+    "step3_title": "Pickup & Smile",
+    "step3_desc": "Pick up the food and enjoy. Good for the planet, great for people."
+  },
+  "browse": {
+    "title": "Available Food",
+    "search_placeholder": "Search food, description...",
+    "category_all": "All Categories",
+    "diet_all": "All Diets",
+    "sort_newest": "Newest",
+    "sort_expiring": "Expiring Soon",
+    "no_results": "No listings match your search."
+  },
+  "dashboard": {
+    "welcome": "Welcome back",
+    "stats_orders": "Total Orders",
+    "stats_collected": "Collected",
+    "stats_pending": "Pending",
+    "tab_overview": "Overview",
+    "tab_orders": "Orders",
+    "tab_listings": "Listings",
+    "recent_activity": "Recent Activity"
+  }
+}

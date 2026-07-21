@@ -23,6 +23,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [successMsg] = useState(isRegistered ? 'Account created successfully! Please sign in.' : (isExpired ? 'Your session has expired. Please sign in again.' : ''));
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [otp, setOtp] = useState('');
   const [forgotMsg, setForgotMsg] = useState('');
   const { login, adminLogin } = useAuth();
   const navigate = useNavigate();
@@ -32,8 +34,12 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
-      navigate(redirectTo);
+      const res = await login(email, password, otp);
+      if (res && res.requires2fa) {
+        setRequires2FA(true);
+      } else {
+        navigate(redirectTo);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -158,26 +164,45 @@ export default function Login() {
               </form>
             ) : (
               <form onSubmit={handleUserSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-text mb-2">Email address</label>
-                  <div className="relative">
-                    <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="input-field pl-14" placeholder="you@example.com" />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-semibold text-text">Password</label>
-                    <button type="button" onClick={() => { setForgotPasswordMode(true); setError(''); }} className="text-xs text-accent hover:text-accent-dark font-semibold transition-colors">Forgot password?</button>
-                  </div>
-                  <div className="relative">
-                    <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="input-field pl-14" placeholder="Enter your password" />
-                  </div>
-                </div>
-                <button type="submit" disabled={loading} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect">
-                  {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Signing in...</span> : 'Sign In'}
-                </button>
+                {!requires2FA ? (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-text mb-2">Email address</label>
+                      <div className="relative">
+                        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="input-field pl-14" placeholder="you@example.com" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-semibold text-text">Password</label>
+                        <button type="button" onClick={() => { setForgotPasswordMode(true); setError(''); }} className="text-xs text-accent hover:text-accent-dark font-semibold transition-colors">Forgot password?</button>
+                      </div>
+                      <div className="relative">
+                        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="input-field pl-14" placeholder="Enter your password" />
+                      </div>
+                    </div>
+                    <button type="submit" disabled={loading} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect">
+                      {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Signing in...</span> : 'Sign In'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-4">
+                      <label className="block text-sm font-semibold text-text mb-2 text-center">Two-Factor Authentication</label>
+                      <p className="text-xs text-subtle text-center mb-4">Enter the 6-digit code from your authenticator app</p>
+                      <div className="relative">
+                        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        <input type="text" value={otp} onChange={e => setOtp(e.target.value)} required className="input-field pl-14 text-center tracking-widest text-lg font-mono" placeholder="000000" maxLength={6} autoFocus />
+                      </div>
+                    </div>
+                    <button type="submit" disabled={loading} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect">
+                      {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Verifying...</span> : 'Verify & Sign In'}
+                    </button>
+                    <button type="button" onClick={() => { setRequires2FA(false); setOtp(''); }} className="w-full text-center text-sm text-accent font-semibold mt-4">Back</button>
+                  </>
+                )}
                 <p className="text-center text-sm text-muted pt-2">Don't have an account? <Link to="/register" className="text-accent hover:text-accent-dark font-semibold transition-colors">Create one</Link></p>
                 <p className="text-center text-xs text-muted"><Link to="/" className="hover:text-accent transition-colors">← Back to home</Link></p>
               </form>

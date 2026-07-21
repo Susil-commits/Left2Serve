@@ -9,6 +9,8 @@ import ReviewModal from '../components/ReviewModal';
 import Chat from '../components/Chat';
 import QRGenerator from '../components/QRGenerator';
 import QRScanner from '../components/QRScanner';
+import DonorAnalytics from '../components/DonorAnalytics';
+import { useTranslation } from 'react-i18next';
 
 const statusConfig = {
   available: { cls: 'badge-green', dot: 'bg-emerald-500', label: 'Available' },
@@ -42,6 +44,7 @@ function paymentMeta(r) {
 }
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { addToast } = useToast();
   const confirm = useConfirm();
@@ -127,17 +130,17 @@ export default function Dashboard() {
   };
 
   const donorStats = [
-    { label: 'Total Listings', value: myListings.length, icon: '📋' },
+    { label: t('dashboard.tab_listings'), value: myListings.length, icon: '📋' },
     { label: 'Available', value: myListings.filter(l => l.status === 'available').length, icon: '🟢' },
     { label: 'Reserved', value: myListings.filter(l => l.status === 'reserved').length, icon: '📌' },
-    { label: 'Collected', value: myListings.filter(l => l.status === 'collected').length, icon: '📦' },
+    { label: t('dashboard.stats_collected'), value: myListings.filter(l => l.status === 'collected').length, icon: '📦' },
   ];
 
   const receiverStats = [
-    { label: 'Total Orders', value: myReservations.length, icon: '📦' },
-    { label: 'Pending', value: myReservations.filter(r => r.status === 'pending').length, icon: '⏳' },
+    { label: t('dashboard.stats_orders'), value: myReservations.length, icon: '📦' },
+    { label: t('dashboard.stats_pending'), value: myReservations.filter(r => r.status === 'pending').length, icon: '⏳' },
     { label: 'Approved', value: myReservations.filter(r => r.status === 'approved').length, icon: '✅' },
-    { label: 'Collected', value: myReservations.filter(r => r.status === 'collected').length, icon: '🎉' },
+    { label: t('dashboard.stats_collected'), value: myReservations.filter(r => r.status === 'collected').length, icon: '🎉' },
   ];
 
   const stats = user.role === 'donor' ? donorStats : receiverStats;
@@ -150,7 +153,7 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-transition">
       <div className="mb-10 animate-fade-in">
-        <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-text mb-2">Dashboard</h1>
+        <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-text mb-2">{t('dashboard.welcome')}</h1>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent/20 to-accent/10 flex items-center justify-center text-accent text-sm font-bold shadow-sm">{user.name[0]}</div>
           <div>
@@ -172,10 +175,12 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {user.role === 'donor' && <DonorAnalytics />}
+
       {user.role === 'donor' && (
         <div className="animate-fade-in-up">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-text">My Listings</h2>
+            <h2 className="text-xl font-bold text-text">My {t('dashboard.tab_listings')}</h2>
             <Link to="/list-food" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>New Listing
             </Link>
@@ -284,7 +289,7 @@ export default function Dashboard() {
       {(user.role === 'ngo' || user.role === 'volunteer') && (
         <div className="animate-fade-in-up">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-text">My Orders</h2>
+            <h2 className="text-xl font-bold text-text">My {t('dashboard.tab_orders')}</h2>
             <Link to="/browse" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">Browse Food</Link>
           </div>
           {loading ? (

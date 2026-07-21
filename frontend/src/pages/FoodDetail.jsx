@@ -7,6 +7,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import Lightbox from '../components/Lightbox';
 import StarRating from '../components/StarRating';
 import { openRazorpayCheckout } from '../utils/razorpay';
+import { Helmet } from 'react-helmet-async';
 
 const categoryLabels = { event: 'Event', restaurant: 'Restaurant', hotel: 'Hotel', caterer: 'Caterer', household: 'Household' };
 const categoryIcons = { event: '🎉', restaurant: '🍽️', hotel: '🏨', caterer: '🍱', household: '🏠' };
@@ -137,9 +138,21 @@ export default function FoodDetail() {
   const price = Number(listing.price) || 0;
   const isPaid = price > 0;
   const total = Math.round(price * (parseInt(quantity) || 1) * 100) / 100;
+  const pageUrl = window.location.href;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 page-transition">
+      <Helmet>
+        <title>{listing.title} | Left2Serve</title>
+        <meta name="description" content={listing.description || `Available ${categoryLabels[listing.category]} food. Donated to prevent waste.`} />
+        <meta property="og:title" content={listing.title} />
+        <meta property="og:description" content={listing.description || `Claim this food on Left2Serve and help prevent food waste!`} />
+        {listing.image_urls?.[0] && <meta property="og:image" content={listing.image_urls[0]} />}
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
+
       <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm font-semibold text-subtle hover:text-accent transition-colors mb-6 group">
         <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
         Back

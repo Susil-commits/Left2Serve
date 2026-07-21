@@ -9,10 +9,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import initializeDb from './db/init.js';
 import { sweepExpiredListings } from './db/expire.js';
+import { setupCronJobs } from './utils/cron.js';
 import authRoutes from './routes/auth.js';
 import listingRoutes from './routes/listings.js';
 import reservationRoutes from './routes/reservations.js';
@@ -23,6 +25,9 @@ import reviewRoutes from './routes/reviews.js';
 import chatRoutes from './routes/chat.js';
 import watchlistsRoutes from './routes/watchlists.js';
 import forumRoutes from './routes/forum.js';
+import { v4 as uuidv4 } from 'uuid';
+import { xssClean } from './middleware/xss.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -67,6 +72,17 @@ app.use(helmet({
 }));
 app.use(cors({ origin: corsOrigin, credentials: true, maxAge: 86400 }));
 app.use(express.json({ limit: '1mb' }));
+app.use(compression());
+
+// Inject Request ID
+app.use((req: Request, res: Response, next: NextFunction) => {
+  (req as any).reqId = uuidv4();
+  next();
+});
+
+// XSS Sanitization
+app.use(xssClean);
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(morgan(isProduction ? 'combined' : 'dev'));
 
@@ -90,19 +106,8 @@ app.use('/api/forum', forumRoutes);
 app.get('/api/health', (req: Request, res: Response) => res.json({ status: 'ok' }));
 
 app.use((req: Request, res: Response) => { res.status(404).json({ error: 'Not found' }) });
-// eslint-disable-next-line no-unused-vars
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  if (err?.type === 'entity.parse.failed' || err?.type === 'entity.too.large') return res.status(400).json({ error: 'Invalid or too large request body' });
-  if (err?.message?.startsWith('CORS blocked')) return res.status(403).json({ error: 'Not allowed by CORS' });
-  
-  if (!isProduction) {
-    console.error('Unhandled error:', err);
-  } else {
-    console.error('Unhandled error:', err.message);
-  }
-  
-  res.status(500).json({ error: 'Internal server error' });
-});
+
+app.use(errorHandler);
 
 export const io = new SocketIOServer(server, {
   cors: {
@@ -180,7 +185,7 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5000;
 initializeDb().then(async () => {
   await sweepExpiredListings();
-  setInterval(sweepExpiredListings, 5 * 60 * 1000);
+  setupCronJobs();
   server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }).catch((err) => {
   console.error('FATAL: Failed to start server:\n' + (err.message || err));

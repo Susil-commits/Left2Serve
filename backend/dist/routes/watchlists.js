@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { get, all, insert, run } from '../db/database.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
+import { validateIdParam } from '../middleware/validateParam.js';
+import { z } from 'zod';
+import { validate } from '../middleware/validate.js';
 const router = Router();
 router.use(authMiddleware);
 router.use(roleMiddleware('ngo', 'volunteer'));
@@ -13,10 +16,14 @@ router.get('/', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch watchlists' });
     }
 });
-router.post('/', async (req, res) => {
+const watchlistSchema = z.object({
+    keyword: z.string().optional().nullable(),
+    latitude: z.preprocess((val) => Number(val), z.number()),
+    longitude: z.preprocess((val) => Number(val), z.number()),
+    radius_km: z.preprocess((val) => Number(val) || 10, z.number().positive())
+});
+router.post('/', validate(watchlistSchema), async (req, res) => {
     const { keyword, latitude, longitude, radius_km } = req.body;
-    if (!latitude || !longitude)
-        return res.status(400).json({ error: 'Latitude and longitude are required' });
     try {
         const id = await insert('INSERT INTO watchlists (user_id, keyword, latitude, longitude, radius_km) VALUES (?, ?, ?, ?, ?)', [req.user.id, keyword ? String(keyword).trim() : null, Number(latitude), Number(longitude), Number(radius_km) || 10]);
         const w = await get('SELECT * FROM watchlists WHERE id = ?', [id]);
@@ -26,7 +33,7 @@ router.post('/', async (req, res) => {
         res.status(500).json({ error: 'Failed to create watchlist' });
     }
 });
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', validateIdParam('id'), async (req, res) => {
     const item = await get('SELECT * FROM watchlists WHERE id = ?', [req.params.id]);
     if (!item)
         return res.status(404).json({ error: 'Not found' });

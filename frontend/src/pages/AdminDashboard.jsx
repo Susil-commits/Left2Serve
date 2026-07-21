@@ -4,8 +4,10 @@ import { api } from '../api';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmDialog';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 const tabs = ['Overview', 'Users', 'NGOs', 'Orders', 'Listings', 'Audit'];
+const COLORS = ['#ef4444', '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1'];
 
 const statusConfig = {
   available: { cls: 'badge-green', dot: 'bg-emerald-400' },
@@ -219,38 +221,42 @@ export default function AdminDashboard() {
                 </div>
 
                 {trends && trends.series && (
-                  <div className="premium-card p-6 mb-8 animate-fade-in">
-                    <div className="flex items-center justify-between mb-5">
-                      <h3 className="font-bold text-text flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-accent" />Activity (Last 14 Days)</h3>
-                      <div className="flex items-center gap-4 text-xs">
-                        <span className="flex items-center gap-1.5 text-subtle"><span className="w-2.5 h-2.5 rounded bg-accent" />Reservations</span>
-                        <span className="flex items-center gap-1.5 text-subtle"><span className="w-2.5 h-2.5 rounded bg-emerald-400" />Meals collected</span>
+                  <div className="grid md:grid-cols-3 gap-6 mb-8 animate-fade-in">
+                    <div className="md:col-span-2 premium-card p-6">
+                      <h3 className="font-bold text-text mb-5 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-accent" />Activity (Last 14 Days)</h3>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={trends.series} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                            <XAxis dataKey="date" tickFormatter={(val) => new Date(val).getDate()} tick={{ fontSize: 10, fill: '#8b8d97' }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 10, fill: '#8b8d97' }} axisLine={false} tickLine={false} />
+                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
+                            <Legend wrapperStyle={{ fontSize: '12px' }} />
+                            <Line type="monotone" dataKey="reservations" name="Reservations" stroke="#ef4444" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                            <Line type="monotone" dataKey="meals" name="Meals Collected" stroke="#10b981" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
-                    <div className="flex items-end gap-1.5 h-40">
-                      {trends.series.map((d) => {
-                        const max = Math.max(1, ...trends.series.map((s) => s.reservations), ...trends.series.map((s) => s.meals));
-                        const rH = Math.round((d.reservations / max) * 100);
-                        const mH = Math.round((d.meals / max) * 100);
-                        return (
-                          <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group min-w-0">
-                            <div className="w-full flex items-end justify-center gap-0.5 h-full">
-                              <div className="w-1.5 rounded-t bg-accent/80 group-hover:bg-accent transition-colors" style={{ height: `${rH}%` }} title={`${d.reservations} reservations`} />
-                              <div className="w-1.5 rounded-t bg-emerald-300 group-hover:bg-emerald-400 transition-colors" style={{ height: `${mH}%` }} title={`${d.meals} meals`} />
-                            </div>
-                            <span className="text-[8px] text-muted">{new Date(d.date).getDate()}</span>
-                          </div>
-                        );
-                      })}
+                    <div className="premium-card p-6">
+                      <h3 className="font-bold text-text mb-5 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500" />Listings by Category</h3>
+                      {trends.byCategory && trends.byCategory.length > 0 ? (
+                        <div className="h-64 flex flex-col items-center">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={trends.byCategory} dataKey="count" nameKey="category" cx="50%" cy="45%" innerRadius={50} outerRadius={70} paddingAngle={2}>
+                                {trends.byCategory.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
+                              <Legend wrapperStyle={{ fontSize: '12px', textTransform: 'capitalize' }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <div className="h-64 flex items-center justify-center text-subtle text-sm">No category data</div>
+                      )}
                     </div>
-                    {trends.byCategory && trends.byCategory.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-border">
-                        <span className="text-xs font-semibold text-subtle uppercase tracking-wider mr-1 self-center">By category:</span>
-                        {trends.byCategory.map((c) => (
-                          <span key={c.category} className="badge badge-outline text-[10px] capitalize">{c.category} · {c.count}</span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 )}
 

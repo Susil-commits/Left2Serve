@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { api } from '../api';
+import { useTranslation } from 'react-i18next';
 
 const useScrollReveal = () => {
   useEffect(() => {
@@ -68,6 +69,7 @@ const faqItems = [
 ];
 
 export default function Home() {
+  const { t } = useTranslation();
   useScrollReveal();
   const [openFaq, setOpenFaq] = useState(null);
   const [stats, setStats] = useState({ mealsSaved: 0, totalDonors: 0, totalReceivers: 0, activeListings: 0 });
@@ -106,11 +108,11 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className="reveal-left">
               <div className="hero-badge mb-6"><span className="w-2 h-2 bg-accent rounded-full animate-pulse" />Making a difference, one meal at a time</div>
-              <h1 className="text-5xl lg:text-6xl font-extrabold leading-[1.06] tracking-[-0.04em] text-text mb-6 text-balance">Share Food,<br /><span className="gradient-text">Reduce Waste,</span><br />Feed Communities</h1>
-              <p className="section-subtitle mb-8 text-lg">Left2Serve connects surplus food with those who need it most. Join a network of restaurants, shelters, and volunteers fighting hunger and food waste together.</p>
+              <h1 className="text-5xl lg:text-6xl font-extrabold leading-[1.06] tracking-[-0.04em] text-text mb-6 text-balance">{t('hero.title')}</h1>
+              <p className="section-subtitle mb-8 text-lg">{t('hero.subtitle')}</p>
               <div className="flex flex-wrap gap-4">
-                <Link to="/register" className="btn-primary ripple-effect">Get Started Free</Link>
-                <Link to="/browse" className="btn-outline">Browse Listings</Link>
+                <Link to="/register" className="btn-primary ripple-effect">{t('hero.cta_donate')}</Link>
+                <Link to="/browse" className="btn-outline">{t('hero.cta_browse')}</Link>
               </div>
               <div className="relative">
                 <div className="flex gap-8 mt-10 pt-8 border-t border-border">
@@ -158,12 +160,12 @@ export default function Home() {
 
       <section className="py-24 relative">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16 reveal"><span className="section-badge">How It Works</span><h2 className="section-title mb-4">Three Simple Steps</h2><p className="section-subtitle mx-auto">Getting food to those who need it has never been easier.</p></div>
+          <div className="text-center mb-16 reveal"><span className="section-badge">{t('home.how_it_works')}</span><h2 className="section-title mb-4">Three Simple Steps</h2><p className="section-subtitle mx-auto">Getting food to those who need it has never been easier.</p></div>
           <div className="grid md:grid-cols-3 gap-8 relative timeline-line">
             {[
-              { step: '01', icon: '📋', title: 'List Your Food', desc: 'Post surplus food with details', features: ['Quantity & type', 'Pickup location', 'Expiry time', 'Photo upload'] },
-              { step: '02', icon: '🔔', title: 'Get Matched', desc: 'Nearby receivers browse and reserve', features: ['Browse listings', 'Smart filtering', 'Category search', 'Instant reservations'] },
-              { step: '03', icon: '🤝', title: 'Pickup & Complete', desc: 'Coordinate and confirm pickup', features: ['Pickup coordination', 'Status tracking', 'Order management', 'Impact dashboard'] },
+              { step: '01', icon: '📋', title: t('home.step1_title'), desc: t('home.step1_desc'), features: ['Quantity & type', 'Pickup location', 'Expiry time', 'Photo upload'] },
+              { step: '02', icon: '🔔', title: t('home.step2_title'), desc: t('home.step2_desc'), features: ['Browse listings', 'Smart filtering', 'Category search', 'Instant reservations'] },
+              { step: '03', icon: '🤝', title: t('home.step3_title'), desc: t('home.step3_desc'), features: ['Pickup coordination', 'Status tracking', 'Order management', 'Impact dashboard'] },
             ].map((item, i) => (
               <div key={i} className="premium-card card-hover-lift p-8 relative z-10 reveal" style={{ transitionDelay: `${i * 0.15}s` }}>
                 <div className="flex items-center justify-between mb-5"><div className="icon-circle">{item.icon}</div><span className="text-4xl font-extrabold text-accent/8">{item.step}</span></div>

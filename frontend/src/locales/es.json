@@ -1,0 +1,48 @@
+{
+  "navbar": {
+    "dashboard": "Panel",
+    "browse_food": "Explorar Comida",
+    "forum": "Foro",
+    "impact": "Impacto",
+    "saved": "Guardados",
+    "list_food": "Donar Comida",
+    "login": "Iniciar sesión",
+    "sign_up": "Registrarse",
+    "profile": "Perfil",
+    "logout": "Cerrar sesión"
+  },
+  "hero": {
+    "title": "Convierte los Excedentes en Sonrisas",
+    "subtitle": "Únete a miles de restaurantes, hoteles e individuos que evitan el desperdicio de alimentos y alimentan a las comunidades.",
+    "cta_donate": "Donar Comida",
+    "cta_browse": "Explorar Publicaciones"
+  },
+  "home": {
+    "how_it_works": "Cómo Funciona",
+    "step1_title": "Publica Excedentes",
+    "step1_desc": "Los donantes publican fácilmente comida de alta calidad que les sobra.",
+    "step2_title": "Encuentra y Reserva",
+    "step2_desc": "ONGs e individuos buscan publicaciones locales y reservan lo que necesitan.",
+    "step3_title": "Recoge y Sonríe",
+    "step3_desc": "Recoge la comida y disfruta. Bueno para el planeta y las personas."
+  },
+  "browse": {
+    "title": "Comida Disponible",
+    "search_placeholder": "Buscar comida, descripción...",
+    "category_all": "Todas las Categorías",
+    "diet_all": "Todas las Dietas",
+    "sort_newest": "Más Reciente",
+    "sort_expiring": "Por Expirar",
+    "no_results": "No hay resultados que coincidan."
+  },
+  "dashboard": {
+    "welcome": "Bienvenido de nuevo",
+    "stats_orders": "Total de Órdenes",
+    "stats_collected": "Recolectadas",
+    "stats_pending": "Pendientes",
+    "tab_overview": "Resumen",
+    "tab_orders": "Órdenes",
+    "tab_listings": "Publicaciones",
+    "recent_activity": "Actividad Reciente"
+  }
+}

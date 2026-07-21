@@ -38,7 +38,7 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener('auth:expired', onExpired);
   }, [navigate, location.pathname]);
 
-  const login = async (email, password) => { const data = await api.auth.login({ email, password }); localStorage.setItem('token', data.token); setUser(data.user); return data.user; };
+  const login = async (email, password, otp) => { const data = await api.auth.login({ email, password, otp }); if (data.requires2fa) return data; localStorage.setItem('token', data.token); setUser(data.user); return data; };
   const register = async (userData) => { const data = await api.auth.register(userData); localStorage.setItem('token', data.token); setUser(data.user); return data.user; };
   const adminLogin = async (adminCode) => { const data = await api.admin.login({ adminCode }); localStorage.setItem('token', data.token); setUser(data.user); return data.user; };
   const updateUser = async (userData) => { setUser(prev => ({ ...prev, ...userData })); };

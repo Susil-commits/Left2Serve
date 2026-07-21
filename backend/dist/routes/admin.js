@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { get, all, run } from '../db/database.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
+import { validateIdParam } from '../middleware/validateParam.js';
 import { createNotification } from '../db/notify.js';
 import { audit } from '../db/audit.js';
 import { recomputeListingStatus } from '../db/availability.js';
@@ -96,7 +97,7 @@ router.get('/listings', authMiddleware, roleMiddleware('admin'), async (req, res
         res.status(500).json({ error: 'Failed to fetch listings' });
     }
 });
-router.delete('/listings/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.delete('/listings/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req, res) => {
     try {
         const listing = await get('SELECT id, user_id, title, status FROM food_listings WHERE id = ?', [req.params.id]);
         if (!listing)
@@ -110,7 +111,7 @@ router.delete('/listings/:id', authMiddleware, roleMiddleware('admin'), async (r
         res.status(500).json({ error: 'Failed to delete listing' });
     }
 });
-router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req, res) => {
     try {
         const { status } = req.body;
         const allowed = ['approved', 'collected', 'cancelled'];
@@ -137,7 +138,7 @@ router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), async (req,
         res.status(500).json({ error: 'Failed to update order' });
     }
 });
-router.patch('/users/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.patch('/users/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req, res) => {
     try {
         const { role, isActive } = req.body;
         const user = await get('SELECT id, role, is_active FROM users WHERE id = ?', [req.params.id]);
@@ -172,7 +173,7 @@ router.patch('/users/:id', authMiddleware, roleMiddleware('admin'), async (req, 
         res.status(500).json({ error: 'Failed to update user' });
     }
 });
-router.delete('/users/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.delete('/users/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req, res) => {
     try {
         const user = await get('SELECT id, role FROM users WHERE id = ?', [req.params.id]);
         if (!user)
@@ -187,7 +188,7 @@ router.delete('/users/:id', authMiddleware, roleMiddleware('admin'), async (req,
         res.status(500).json({ error: 'Failed to delete user' });
     }
 });
-router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req, res) => {
     try {
         const user = await get('SELECT id, role, email FROM users WHERE id = ?', [req.params.id]);
         if (!user)

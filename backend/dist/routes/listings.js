@@ -1,17 +1,16 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
-import { get, all, run, insert } from '../db/database.js';
+import { get, all, run } from '../db/database.js';
 import { authMiddleware, roleMiddleware, optionalAuth } from '../middleware/auth.js';
 import { recomputeListingStatus, REMAINING_SQL } from '../db/availability.js';
-import { createNotification } from '../db/notify.js';
+import { z } from 'zod';
+import { validate } from '../middleware/validate.js';
+import { validateIdParam } from '../middleware/validateParam.js';
+import { cacheMiddleware } from '../utils/cache.js';
+import { ListingService } from '../services/ListingService.js';
 function withRemaining(l) {
-    const obj = { ...l, image_urls: l.image_urls || [] };
-    if (obj.remaining == null)
-        obj.remaining = Number(l.quantity) || 0;
-    else
-        obj.remaining = Number(obj.remaining);
-    return obj;
+    return ListingService.withRemaining(l);
 }
 const router = Router();
 const CLOUDINARY_CONFIGURED = !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
@@ -48,49 +47,62 @@ router.post('/upload', authMiddleware, upload.array('images', 5), async (req, re
         res.status(500).json({ error: 'Upload failed' });
     }
 });
-router.get('/', async (req, res) => {
-    const { category, status, search, sort } = req.query;
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(48, Math.max(1, parseInt(req.query.limit) || 12));
-    let query = `SELECT fl.*, u.name as donor_name, u.organization as donor_org, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE 1=1`;
-    let countQuery = `SELECT COUNT(*) as total FROM food_listings fl WHERE 1=1`;
-    const params = [];
-    const countParams = [];
-    if (category) {
-        query += ' AND fl.category = ?';
-        countQuery += ' AND fl.category = ?';
-        params.push(category);
-        countParams.push(category);
+router.get('/', cacheMiddleware(60), async (req, res, next) => {
+    try {
+        const queryOptions = {
+            category: req.query.category,
+            status: req.query.status,
+            search: req.query.search,
+            sort: req.query.sort,
+            dietary: req.query.dietary,
+            page: Math.max(1, parseInt(req.query.page) || 1),
+            limit: Math.min(48, Math.max(1, parseInt(req.query.limit) || 12)),
+            lat: req.query.lat,
+            lng: req.query.lng,
+            distance: req.query.distance
+        };
+        const result = await ListingService.getAllListings(queryOptions);
+        res.json(result);
     }
-    if (status) {
-        query += ' AND fl.status = ?';
-        countQuery += ' AND fl.status = ?';
-        params.push(status);
-        countParams.push(status);
+    catch (err) {
+        next(err);
     }
-    else {
-        query += " AND fl.status = 'available' AND fl.expiry_date > NOW()";
-        countQuery += " AND fl.status = 'available' AND fl.expiry_date > NOW()";
+});
+router.get('/analytics/me', authMiddleware, roleMiddleware('donor'), async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        // Get monthly meals saved
+        const monthlyStats = await all(`
+      SELECT 
+        TO_CHAR(r.updated_at, 'YYYY-MM') as month,
+        SUM(r.quantity) as meals_saved
+      FROM reservations r
+      JOIN food_listings fl ON r.food_listing_id = fl.id
+      WHERE fl.user_id = ? AND r.status = 'collected'
+      GROUP BY TO_CHAR(r.updated_at, 'YYYY-MM')
+      ORDER BY month ASC
+    `, [userId]);
+        // Get total listings and total reserved
+        const [totalListings] = await all('SELECT COUNT(*) as count FROM food_listings WHERE user_id = ?', [userId]);
+        const [totalDonated] = await all("SELECT COALESCE(SUM(r.quantity), 0) as count FROM reservations r JOIN food_listings fl ON r.food_listing_id = fl.id WHERE fl.user_id = ? AND r.status = 'collected'", [userId]);
+        res.json({
+            monthlyStats,
+            totalListings: totalListings?.count || 0,
+            totalDonated: totalDonated?.count || 0
+        });
     }
-    if (search) {
-        query += ' AND (fl.title LIKE ? OR fl.description LIKE ?)';
-        countQuery += ' AND (fl.title LIKE ? OR fl.description LIKE ?)';
-        params.push(`%${search}%`, `%${search}%`);
-        countParams.push(`%${search}%`, `%${search}%`);
+    catch (err) {
+        next(err);
     }
-    const orderBy = sort === 'expiring' ? 'fl.expiry_date ASC' : sort === 'quantity' ? 'fl.quantity DESC, fl.created_at DESC' : 'fl.created_at DESC';
-    const offset = (page - 1) * limit;
-    query += ` ORDER BY ${orderBy} LIMIT ${limit} OFFSET ${offset}`;
-    const [listings, countRow] = await Promise.all([all(query, params), get(countQuery, countParams)]);
-    const total = countRow ? countRow.total : 0;
-    res.json({
-        listings: listings.map(withRemaining),
-        pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
-    });
 });
 router.get('/mine', authMiddleware, async (req, res) => {
-    const listings = await all(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.user_id = ? ORDER BY fl.created_at DESC`, [req.user.id]);
-    res.json(listings.map(withRemaining));
+    try {
+        const listings = await all(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.user_id = ? ORDER BY fl.created_at DESC`, [req.user.id]);
+        res.json(listings.map(withRemaining));
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Failed to fetch your listings' });
+    }
 });
 router.get('/stats', async (req, res) => {
     try {
@@ -131,80 +143,73 @@ router.get('/impact', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch impact' });
     }
 });
-router.get('/:id', optionalAuth, async (req, res) => {
-    const listing = await get(`SELECT fl.*, u.name as donor_name, u.organization as donor_org, u.phone as donor_phone, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE fl.id = ?`, [req.params.id]);
-    if (!listing)
-        return res.status(404).json({ error: 'Listing not found' });
-    const out = withRemaining(listing);
-    const isOwner = req.user && req.user.id === listing.user_id;
-    const isAdmin = req.user && req.user.role === 'admin';
-    let canSeeDonorContact = isOwner || isAdmin;
-    if (!canSeeDonorContact && req.user && (req.user.role === 'ngo' || req.user.role === 'volunteer')) {
-        const [r] = await all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('approved','collected')", [listing.id, req.user.id]);
-        if (r)
-            canSeeDonorContact = true;
-    }
-    if (!canSeeDonorContact)
-        delete out.donor_phone;
-    res.json(out);
-});
-router.post('/', authMiddleware, roleMiddleware('donor'), async (req, res) => {
-    const { title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, latitude, longitude } = req.body;
-    if (!title || !category || !quantity || !expiry_date || !pickup_address)
-        return res.status(400).json({ error: 'Title, category, quantity, expiry date, and pickup address are required' });
-    if (!VALID_CATEGORIES.includes(category))
-        return res.status(400).json({ error: 'Invalid category' });
-    const qty = Number(quantity);
-    if (!Number.isFinite(qty) || qty < 1)
-        return res.status(400).json({ error: 'Quantity must be at least 1' });
-    if (new Date(expiry_date).toString() === 'Invalid Date' || new Date(expiry_date) <= new Date())
-        return res.status(400).json({ error: 'Expiry date must be in the future' });
+router.get('/:id', optionalAuth, validateIdParam('id'), async (req, res) => {
     try {
-        const images = sanitizeImageUrls(image_urls);
-        const lat = latitude ? Number(latitude) : null;
-        const lng = longitude ? Number(longitude) : null;
-        const id = await insert(`INSERT INTO food_listings (user_id, title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [req.user.id, String(title).trim(), description || null, category, qty, unit || 'servings', price || 0, expiry_date, String(pickup_address).trim(), pickup_instructions || null, JSON.stringify(images), lat, lng]);
-        const listing = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [id]);
-        // Trigger Smart Alerts
-        if (lat !== null && lng !== null) {
-            const searchStr = `${title} ${description || ''} ${category}`;
-            const watchers = await all(`
-        SELECT user_id, keyword FROM watchlists 
-        WHERE user_id != ? 
-        AND (keyword IS NULL OR keyword = '' OR ? ILIKE '%' || keyword || '%')
-        AND ( 6371 * acos(LEAST(1.0, GREATEST(-1.0, cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))) ) <= radius_km
-      `, [req.user.id, searchStr, lat, lng, lat]);
-            for (const w of watchers) {
-                await createNotification(w.user_id, 'watchlist_alert', 'New Food Alert!', `A new listing "${title}" matches your watchlist criteria!`, { listingId: id, keyword: w.keyword });
-            }
+        const listing = await get(`SELECT fl.*, u.name as donor_name, u.organization as donor_org, u.phone as donor_phone, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE fl.id = ?`, [req.params.id]);
+        if (!listing)
+            return res.status(404).json({ error: 'Listing not found' });
+        const out = withRemaining(listing);
+        const isOwner = req.user && req.user.id === listing.user_id;
+        const isAdmin = req.user && req.user.role === 'admin';
+        let canSeeDonorContact = isOwner || isAdmin;
+        if (!canSeeDonorContact && req.user && (req.user.role === 'ngo' || req.user.role === 'volunteer')) {
+            const [r] = await all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('approved','collected')", [listing.id, req.user.id]);
+            if (r)
+                canSeeDonorContact = true;
         }
-        res.status(201).json(withRemaining(listing));
+        if (!canSeeDonorContact)
+            delete out.donor_phone;
+        res.json(out);
     }
     catch (err) {
-        res.status(500).json({ error: 'Failed to create listing' });
+        res.status(500).json({ error: 'Failed to fetch listing' });
     }
 });
-router.put('/:id', authMiddleware, async (req, res) => {
-    const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
-    if (!listing)
-        return res.status(404).json({ error: 'Listing not found' });
-    if (listing.user_id !== req.user.id)
-        return res.status(403).json({ error: 'Not authorized' });
-    const { title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, status, latitude, longitude } = req.body;
-    const nextCategory = category || listing.category;
-    if (!VALID_CATEGORIES.includes(nextCategory))
-        return res.status(400).json({ error: 'Invalid category' });
-    const nextQty = quantity != null ? Number(quantity) : listing.quantity;
-    if (!Number.isFinite(nextQty) || nextQty < 1)
-        return res.status(400).json({ error: 'Quantity must be at least 1' });
-    const nextExpiry = expiry_date || listing.expiry_date;
-    if (expiry_date && (new Date(expiry_date).toString() === 'Invalid Date' || new Date(expiry_date) <= new Date()))
-        return res.status(400).json({ error: 'Expiry date must be in the future' });
+const listingSchema = z.object({
+    title: z.string().min(1, 'Title is required'),
+    description: z.string().optional().nullable(),
+    category: z.enum(['event', 'restaurant', 'hotel', 'caterer', 'household']),
+    quantity: z.preprocess((val) => Number(val), z.number().min(1, 'Quantity must be at least 1')),
+    unit: z.string().optional().default('servings'),
+    price: z.preprocess((val) => Number(val) || 0, z.number().min(0).optional()),
+    expiry_date: z.string().refine((date) => !isNaN(Date.parse(date)) && new Date(date) > new Date(), { message: 'Expiry date must be in the future' }),
+    pickup_address: z.string().min(1, 'Pickup address is required'),
+    pickup_instructions: z.string().optional().nullable(),
+    image_urls: z.array(z.string()).optional().default([]),
+    dietary_preferences: z.array(z.string()).optional().default([]),
+    latitude: z.preprocess((val) => val != null ? Number(val) : null, z.number().nullable().optional()),
+    longitude: z.preprocess((val) => val != null ? Number(val) : null, z.number().nullable().optional())
+});
+router.post('/', authMiddleware, roleMiddleware('donor'), validate(listingSchema), async (req, res, next) => {
     try {
+        const data = req.body;
+        data.image_urls = sanitizeImageUrls(data.image_urls);
+        const listing = await ListingService.createListing(req.user.id, data);
+        res.status(201).json(listing);
+    }
+    catch (err) {
+        next(err);
+    }
+});
+const updateListingSchema = listingSchema.partial().extend({
+    status: z.enum(['available', 'reserved', 'collected', 'expired', 'cancelled']).optional()
+});
+router.put('/:id', authMiddleware, validateIdParam('id'), validate(updateListingSchema), async (req, res) => {
+    try {
+        const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
+        if (!listing)
+            return res.status(404).json({ error: 'Listing not found' });
+        if (listing.user_id !== req.user.id)
+            return res.status(403).json({ error: 'Not authorized' });
+        const { title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, dietary_preferences, status, latitude, longitude } = req.body;
+        const nextCategory = category || listing.category;
+        const nextQty = quantity != null ? Number(quantity) : listing.quantity;
+        const nextExpiry = expiry_date || listing.expiry_date;
         const images = sanitizeImageUrls(image_urls ?? listing.image_urls);
+        const dietaryTags = dietary_preferences !== undefined ? (Array.isArray(dietary_preferences) ? dietary_preferences : []) : listing.dietary_preferences;
         const lat = latitude !== undefined ? (latitude ? Number(latitude) : null) : listing.latitude;
         const lng = longitude !== undefined ? (longitude ? Number(longitude) : null) : listing.longitude;
-        await run(`UPDATE food_listings SET title=?, description=?, category=?, quantity=?, unit=?, price=?, expiry_date=?, pickup_address=?, pickup_instructions=?, image_urls=?, status=?, latitude=?, longitude=? WHERE id=?`, [title ? String(title).trim() : listing.title, description ?? listing.description, nextCategory, nextQty, unit || listing.unit, price ?? listing.price, nextExpiry, pickup_address ? String(pickup_address).trim() : listing.pickup_address, pickup_instructions ?? listing.pickup_instructions, JSON.stringify(images), status || listing.status, lat, lng, req.params.id]);
+        await run(`UPDATE food_listings SET title=?, description=?, category=?, quantity=?, unit=?, price=?, expiry_date=?, pickup_address=?, pickup_instructions=?, image_urls=?, dietary_preferences=?, status=?, latitude=?, longitude=? WHERE id=?`, [title ? String(title).trim() : listing.title, description ?? listing.description, nextCategory, nextQty, unit || listing.unit, price ?? listing.price, nextExpiry, pickup_address ? String(pickup_address).trim() : listing.pickup_address, pickup_instructions ?? listing.pickup_instructions, JSON.stringify(images), JSON.stringify(dietaryTags), status || listing.status, lat, lng, req.params.id]);
         await recomputeListingStatus(req.params.id);
         const updated = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [req.params.id]);
         res.json(withRemaining(updated));
@@ -213,16 +218,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
         res.status(500).json({ error: 'Failed to update listing' });
     }
 });
-router.delete('/:id', authMiddleware, async (req, res) => {
-    const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
-    if (!listing)
-        return res.status(404).json({ error: 'Listing not found' });
-    if (listing.user_id !== req.user.id)
-        return res.status(403).json({ error: 'Not authorized' });
-    const [active] = await all("SELECT COUNT(*) as count FROM reservations WHERE food_listing_id = ? AND status IN ('pending','approved')", [req.params.id]);
-    if (active.count > 0)
-        return res.status(409).json({ error: 'Cannot delete a listing with active reservations. Cancel them first.' });
+router.delete('/:id', authMiddleware, validateIdParam('id'), async (req, res) => {
     try {
+        const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
+        if (!listing)
+            return res.status(404).json({ error: 'Listing not found' });
+        if (listing.user_id !== req.user.id)
+            return res.status(403).json({ error: 'Not authorized' });
+        const [active] = await all("SELECT COUNT(*) as count FROM reservations WHERE food_listing_id = ? AND status IN ('pending','approved')", [req.params.id]);
+        if (active.count > 0)
+            return res.status(409).json({ error: 'Cannot delete a listing with active reservations. Cancel them first.' });
         await run('DELETE FROM food_listings WHERE id = ?', [req.params.id]);
         res.json({ message: 'Listing deleted' });
     }
@@ -230,18 +235,18 @@ router.delete('/:id', authMiddleware, async (req, res) => {
         res.status(500).json({ error: 'Failed to delete listing' });
     }
 });
-router.post('/:id/close', authMiddleware, async (req, res) => {
-    const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
-    if (!listing)
-        return res.status(404).json({ error: 'Listing not found' });
-    if (listing.user_id !== req.user.id)
-        return res.status(403).json({ error: 'Not authorized' });
-    if (['collected', 'expired', 'cancelled'].includes(listing.status))
-        return res.status(400).json({ error: 'Listing is already closed' });
-    const [active] = await all("SELECT COUNT(*) as count FROM reservations WHERE food_listing_id = ? AND status IN ('pending','approved')", [req.params.id]);
-    if (active.count > 0)
-        return res.status(409).json({ error: 'Cannot close a listing with pending or approved reservations' });
+router.post('/:id/close', authMiddleware, validateIdParam('id'), async (req, res) => {
     try {
+        const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
+        if (!listing)
+            return res.status(404).json({ error: 'Listing not found' });
+        if (listing.user_id !== req.user.id)
+            return res.status(403).json({ error: 'Not authorized' });
+        if (['collected', 'expired', 'cancelled'].includes(listing.status))
+            return res.status(400).json({ error: 'Listing is already closed' });
+        const [active] = await all("SELECT COUNT(*) as count FROM reservations WHERE food_listing_id = ? AND status IN ('pending','approved')", [req.params.id]);
+        if (active.count > 0)
+            return res.status(409).json({ error: 'Cannot close a listing with pending or approved reservations' });
         await run("UPDATE food_listings SET status = 'collected' WHERE id = ?", [req.params.id]);
         res.json({ message: 'Listing marked as donated' });
     }

@@ -9,12 +9,11 @@ import { createNotification } from '../db/notify.js';
 import { z } from 'zod';
 import { validate } from '../middleware/validate.js';
 import { validateIdParam } from '../middleware/validateParam.js';
+import { cacheMiddleware } from '../utils/cache.js';
+import { ListingService } from '../services/ListingService.js';
 
-function withRemaining(l) {
-  const obj = { ...l, image_urls: l.image_urls || [] };
-  if (obj.remaining == null) obj.remaining = Number(l.quantity) || 0;
-  else obj.remaining = Number(obj.remaining);
-  return obj;
+function withRemaining(l: any) {
+  return ListingService.withRemaining(l);
 }
 
 const router = Router();
@@ -47,65 +46,53 @@ router.post('/upload', authMiddleware, upload.array('images', 5), async (req: Re
   catch (err) { console.error('Upload error:', err.message); res.status(500).json({ error: 'Upload failed' }); }
 });
 
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', cacheMiddleware(60), async (req: Request, res: Response, next) => {
   try {
-    const { category, status, search, sort, dietary } = req.query;
-    const page = Math.max(1, parseInt((req.query.page as string)) || 1);
-    const limit = Math.min(48, Math.max(1, parseInt((req.query.limit as string)) || 12));
-    let query = `SELECT fl.*, u.name as donor_name, u.organization as donor_org, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE 1=1`;
-    let countQuery = `SELECT COUNT(*) as total FROM food_listings fl WHERE 1=1`;
-    const params: any[] = [];
-    const countParams = [];
-    
-    if (req.query.lat && req.query.lng && req.query.distance) {
-      const lat = Number(req.query.lat);
-      const lng = Number(req.query.lng);
-      const radius = Number(req.query.distance);
-      if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
-        const mysqlDistanceSql = `( 6371 * acos(LEAST(1.0, GREATEST(-1.0, cos(radians(?)) * cos(radians(fl.latitude)) * cos(radians(fl.longitude) - radians(?)) + sin(radians(?)) * sin(radians(fl.latitude))))) )`;
-        query += ` AND ${mysqlDistanceSql} <= ?`;
-        countQuery += ` AND ${mysqlDistanceSql} <= ?`;
-        params.push(lat, lng, lat, radius);
-        countParams.push(lat, lng, lat, radius);
-      }
-    }
+    const queryOptions = {
+      category: req.query.category,
+      status: req.query.status,
+      search: req.query.search,
+      sort: req.query.sort,
+      dietary: req.query.dietary,
+      page: Math.max(1, parseInt((req.query.page as string)) || 1),
+      limit: Math.min(48, Math.max(1, parseInt((req.query.limit as string)) || 12)),
+      lat: req.query.lat,
+      lng: req.query.lng,
+      distance: req.query.distance
+    };
+    const result = await ListingService.getAllListings(queryOptions);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 
-    if (category) { query += ' AND fl.category = ?'; countQuery += ' AND fl.category = ?'; params.push(category); countParams.push(category); }
-    
-    if (dietary) {
-      const tags = String(dietary).split(',').map(t => t.trim()).filter(Boolean);
-      if (tags.length > 0) {
-        query += ' AND fl.dietary_preferences @> ?::jsonb';
-        countQuery += ' AND fl.dietary_preferences @> ?::jsonb';
-        const jsonStr = JSON.stringify(tags);
-        params.push(jsonStr);
-        countParams.push(jsonStr);
-      }
-    }
+router.get('/analytics/me', authMiddleware, roleMiddleware('donor'), async (req: Request, res: Response, next) => {
+  try {
+    const userId = req.user!.id;
+    // Get monthly meals saved
+    const monthlyStats = await all(`
+      SELECT 
+        TO_CHAR(r.updated_at, 'YYYY-MM') as month,
+        SUM(r.quantity) as meals_saved
+      FROM reservations r
+      JOIN food_listings fl ON r.food_listing_id = fl.id
+      WHERE fl.user_id = ? AND r.status = 'collected'
+      GROUP BY TO_CHAR(r.updated_at, 'YYYY-MM')
+      ORDER BY month ASC
+    `, [userId]);
 
-    if (status) {
-      query += ' AND fl.status = ?'; countQuery += ' AND fl.status = ?'; params.push(status); countParams.push(status);
-    } else {
-      query += " AND fl.status = 'available' AND fl.expiry_date > NOW()";
-      countQuery += " AND fl.status = 'available' AND fl.expiry_date > NOW()";
-    }
-    if (search) {
-      query += ' AND (fl.title LIKE ? OR fl.description LIKE ?)';
-      countQuery += ' AND (fl.title LIKE ? OR fl.description LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
-      countParams.push(`%${search}%`, `%${search}%`);
-    }
-    const orderBy = sort === 'expiring' ? 'fl.expiry_date ASC' : sort === 'quantity' ? 'fl.quantity DESC, fl.created_at DESC' : 'fl.created_at DESC';
-    const offset = (page - 1) * limit;
-    query += ` ORDER BY ${orderBy} LIMIT ${limit} OFFSET ${offset}`;
-    const [listings, countRow] = await Promise.all([all(query, params), get(countQuery, countParams)]);
-    const total = countRow ? countRow.total : 0;
+    // Get total listings and total reserved
+    const [totalListings] = await all('SELECT COUNT(*) as count FROM food_listings WHERE user_id = ?', [userId]);
+    const [totalDonated] = await all("SELECT COALESCE(SUM(r.quantity), 0) as count FROM reservations r JOIN food_listings fl ON r.food_listing_id = fl.id WHERE fl.user_id = ? AND r.status = 'collected'", [userId]);
+    
     res.json({
-      listings: listings.map(withRemaining),
-      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+      monthlyStats,
+      totalListings: totalListings?.count || 0,
+      totalDonated: totalDonated?.count || 0
     });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch listings' });
+    next(err);
   }
 });
 
@@ -192,40 +179,15 @@ const listingSchema = z.object({
   longitude: z.preprocess((val) => val != null ? Number(val) : null, z.number().nullable().optional())
 });
 
-router.post('/', authMiddleware, roleMiddleware('donor'), validate(listingSchema), async (req: Request, res: Response) => {
-  const { title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, dietary_preferences, latitude, longitude } = req.body;
-  const qty = Number(quantity);
+router.post('/', authMiddleware, roleMiddleware('donor'), validate(listingSchema), async (req: Request, res: Response, next) => {
   try {
-    const images = sanitizeImageUrls(image_urls);
-    const dietaryTags = Array.isArray(dietary_preferences) ? dietary_preferences : [];
-    const lat = latitude ? Number(latitude) : null;
-    const lng = longitude ? Number(longitude) : null;
-    const id = await insert(`INSERT INTO food_listings (user_id, title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, dietary_preferences, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [req.user!.id, String(title).trim(), description || null, category, qty, unit || 'servings', price || 0, expiry_date, String(pickup_address).trim(), pickup_instructions || null, JSON.stringify(images), JSON.stringify(dietaryTags), lat, lng]);
-    const listing = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [id]);
-    
-    // Trigger Smart Alerts
-    if (lat !== null && lng !== null) {
-      const searchStr = `${title} ${description || ''} ${category}`;
-      const watchers = await all(`
-        SELECT user_id, keyword FROM watchlists 
-        WHERE user_id != ? 
-        AND (keyword IS NULL OR keyword = '' OR ? ILIKE '%' || keyword || '%')
-        AND ( 6371 * acos(LEAST(1.0, GREATEST(-1.0, cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))) ) <= radius_km
-      `, [req.user!.id, searchStr, lat, lng, lat]);
-      
-      for (const w of watchers) {
-        await createNotification(
-          w.user_id,
-          'watchlist_alert',
-          'New Food Alert!',
-          `A new listing "${title}" matches your watchlist criteria!`,
-          { listingId: id, keyword: w.keyword }
-        );
-      }
-    }
-    
-    res.status(201).json(withRemaining(listing));
-  } catch (err) { res.status(500).json({ error: 'Failed to create listing' }); }
+    const data = req.body;
+    data.image_urls = sanitizeImageUrls(data.image_urls);
+    const listing = await ListingService.createListing(req.user!.id, data);
+    res.status(201).json(listing);
+  } catch (err) {
+    next(err);
+  }
 });
 
 const updateListingSchema = listingSchema.partial().extend({

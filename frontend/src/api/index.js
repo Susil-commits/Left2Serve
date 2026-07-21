@@ -45,6 +45,9 @@ export const api = {
     changePassword: (body) => request('/auth/password', { method: 'PUT', body }),
     forgotPassword: (body) => request('/auth/forgot-password', { method: 'POST', body }),
     resetPassword: (body) => request('/auth/reset-password', { method: 'POST', body }),
+    setup2FA: () => request('/auth/2fa/setup'),
+    verify2FA: (body) => request('/auth/2fa/verify', { method: 'POST', body }),
+    disable2FA: (body) => request('/auth/2fa/disable', { method: 'POST', body }),
   },
   listings: {
     getAll: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/listings${qs ? `?${qs}` : ''}`); },

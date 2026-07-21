@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { useFavorites } from './Favorites';
 import { useConfirm } from './ConfirmDialog';
 import NotificationBell from './NotificationBell';
+import { useTranslation } from 'react-i18next';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -11,6 +12,7 @@ export default function Navbar() {
   const confirm = useConfirm();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t, i18n } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isActive = (path) => location.pathname === path ? 'text-accent bg-accent/5' : 'text-subtle hover:text-accent hover:bg-accent/3';
   const isSavedActive = () => location.pathname === '/saved' ? 'text-accent bg-accent/5' : 'text-subtle hover:text-accent hover:bg-accent/3';
@@ -25,12 +27,16 @@ export default function Navbar() {
     closeMobile();
   };
 
+  const toggleLanguage = () => {
+    i18n.changeLanguage(i18n.language.startsWith('es') ? 'en' : 'es');
+  };
+
   const navLinks = user ? (
     <>
-      <Link to="/dashboard" onClick={closeMobile} className={`btn-ghost ${isActive('/dashboard')}`}>Dashboard</Link>
+      <Link to="/dashboard" onClick={closeMobile} className={`btn-ghost ${isActive('/dashboard')}`}>{t('navbar.dashboard')}</Link>
       {user.role === 'donor' && (
         <Link to="/list-food" onClick={closeMobile} className="btn-primary !py-2 !px-4 !text-sm !rounded-xl ml-1 ripple-effect">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>List Food
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>{t('navbar.list_food')}
         </Link>
       )}
     </>
@@ -48,11 +54,14 @@ export default function Navbar() {
             </Link>
 
             <div className="hidden md:flex items-center gap-1">
-              <Link to="/browse" aria-label="Browse food listings" className={`btn-ghost ${isActive('/browse')}`}>Browse</Link>
-              <Link to="/forum" aria-label="Community Forum" className={`btn-ghost ${isActive('/forum')}`}>Community</Link>
-              <Link to="/impact" aria-label="Community impact" className={`btn-ghost ${isActive('/impact')}`}>Impact</Link>
+              <button onClick={toggleLanguage} className="btn-ghost text-xs mr-2 font-bold uppercase" aria-label="Toggle language">
+                {i18n.language.startsWith('es') ? 'ES' : 'EN'}
+              </button>
+              <Link to="/browse" aria-label="Browse food listings" className={`btn-ghost ${isActive('/browse')}`}>{t('navbar.browse_food')}</Link>
+              <Link to="/forum" aria-label="Community Forum" className={`btn-ghost ${isActive('/forum')}`}>{t('navbar.forum')}</Link>
+              <Link to="/impact" aria-label="Community impact" className={`btn-ghost ${isActive('/impact')}`}>{t('navbar.impact')}</Link>
               <Link to="/saved" aria-label={`Saved listings${favCount ? ` (${favCount})` : ''}`} className={`btn-ghost relative ${isSavedActive()}`}>
-                Saved
+                {t('navbar.saved')}
                 {favCount > 0 && <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-accent text-white text-[9px] font-bold flex items-center justify-center">{favCount > 9 ? '9+' : favCount}</span>}
               </Link>
               {user?.role === 'admin' && <Link to="/admin/dashboard" onClick={closeMobile} className={`btn-ghost ${isActive('/admin/dashboard')}`}>Admin Panel</Link>}
@@ -68,12 +77,12 @@ export default function Navbar() {
                     <div className="text-sm font-semibold text-text leading-tight">{user.name}</div>
                     <div className="text-xs text-accent capitalize">{user.role}</div>
                   </div>
-                  <button onClick={handleLogout} aria-label="Log out" className="text-xs text-subtle hover:text-accent transition-colors font-medium hover:scale-105 transform">Logout</button>
+                  <button onClick={handleLogout} aria-label="Log out" className="text-xs text-subtle hover:text-accent transition-colors font-medium hover:scale-105 transform">{t('navbar.logout')}</button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 ml-2">
-                  <Link to="/login" className="btn-ghost">Login</Link>
-                  <Link to="/register" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">Register</Link>
+                  <Link to="/login" className="btn-ghost">{t('navbar.login')}</Link>
+                  <Link to="/register" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">{t('navbar.sign_up')}</Link>
                 </div>
               )}
             </div>
@@ -92,11 +101,14 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="md:hidden glass border-t border-border animate-slide-down">
             <div className="px-4 py-4 space-y-2">
-              <Link to="/browse" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/browse')}`}>Browse</Link>
-              <Link to="/forum" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/forum')}`}>Community</Link>
-              <Link to="/impact" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/impact')}`}>Impact</Link>
+              <button onClick={toggleLanguage} className="block px-4 py-3 rounded-xl text-sm font-semibold transition-all hover:bg-accent/5 w-full text-left">
+                Language: {i18n.language.startsWith('es') ? 'Español' : 'English'}
+              </button>
+              <Link to="/browse" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/browse')}`}>{t('navbar.browse_food')}</Link>
+              <Link to="/forum" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/forum')}`}>{t('navbar.forum')}</Link>
+              <Link to="/impact" onClick={closeMobile} className={`block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/impact')}`}>{t('navbar.impact')}</Link>
               <Link to="/saved" onClick={closeMobile} className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isSavedActive()}`}>
-                <span>Saved</span>
+                <span>{t('navbar.saved')}</span>
                 {favCount > 0 && <span className="min-w-4 h-4 px-1 rounded-full bg-accent text-white text-[9px] font-bold flex items-center justify-center">{favCount > 9 ? '9+' : favCount}</span>}
               </Link>
               {user ? (
@@ -112,13 +124,13 @@ export default function Navbar() {
                       )}
                     </>
                   )}
-                  <Link to="/profile" onClick={closeMobile} className="block px-4 py-3 rounded-xl text-sm font-semibold transition-all text-subtle hover:text-accent hover:bg-accent/3">Profile</Link>
-                  <button onClick={handleLogout} className="block w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 transition-all">Logout</button>
+                  <Link to="/profile" onClick={closeMobile} className="block px-4 py-3 rounded-xl text-sm font-semibold transition-all text-subtle hover:text-accent hover:bg-accent/3">{t('navbar.profile')}</Link>
+                  <button onClick={handleLogout} className="block w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 transition-all">{t('navbar.logout')}</button>
                 </>
               ) : (
                 <>
-                  <Link to="/login" onClick={closeMobile} className="block px-4 py-3 rounded-xl text-sm font-semibold transition-all text-subtle hover:text-accent hover:bg-accent/3">Login</Link>
-                  <Link to="/register" onClick={closeMobile} className="block px-4 py-3 rounded-xl text-sm font-semibold text-white bg-accent text-center">Register</Link>
+                  <Link to="/login" onClick={closeMobile} className="block px-4 py-3 rounded-xl text-sm font-semibold transition-all text-subtle hover:text-accent hover:bg-accent/3">{t('navbar.login')}</Link>
+                  <Link to="/register" onClick={closeMobile} className="block px-4 py-3 rounded-xl text-sm font-semibold text-white bg-accent text-center">{t('navbar.sign_up')}</Link>
                 </>
               )}
             </div>

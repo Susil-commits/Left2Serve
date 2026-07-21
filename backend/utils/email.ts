@@ -1,4 +1,11 @@
 import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
+
+const defaultFrom = process.env.SMTP_FROM || process.env.SMTP_USER || '"Left2Serve" <no-reply@left2serve.com>';
+
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -10,14 +17,24 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const defaultFrom = process.env.SMTP_FROM || process.env.SMTP_USER || '"Left2Serve" <no-reply@left2serve.com>';
-
 export async function sendEmail(to: string, subject: string, html: string, text?: string) {
-  if (!process.env.SMTP_USER) {
-    console.warn('SMTP_USER not configured. Skipping email to:', to);
-    return;
-  }
   try {
+    if (process.env.SENDGRID_API_KEY) {
+      await sgMail.send({
+        to,
+        from: defaultFrom,
+        subject,
+        text: text || html.replace(/<[^>]+>/g, ''),
+        html,
+      });
+      return;
+    }
+
+    if (!process.env.SMTP_USER) {
+      console.warn('Neither SENDGRID_API_KEY nor SMTP_USER configured. Skipping email to:', to);
+      return;
+    }
+
     await transporter.sendMail({
       from: defaultFrom,
       to,

@@ -35,6 +35,7 @@ async function initialize() {
     pickup_address TEXT NOT NULL,
     pickup_instructions TEXT,
     image_urls JSONB DEFAULT '[]',
+    dietary_preferences JSONB DEFAULT '[]',
     status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available','reserved','collected','expired','cancelled')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
@@ -145,6 +146,8 @@ async function initialize() {
     await addColumnIfMissing('users', 'locked_until', 'locked_until TIMESTAMP NULL DEFAULT NULL');
     await addColumnIfMissing('users', 'reset_token', 'reset_token VARCHAR(255) NULL');
     await addColumnIfMissing('users', 'reset_expires', 'reset_expires TIMESTAMP NULL');
+    await addColumnIfMissing('users', 'two_factor_secret', 'two_factor_secret VARCHAR(255) NULL');
+    await addColumnIfMissing('users', 'two_factor_enabled', 'two_factor_enabled BOOLEAN DEFAULT FALSE');
     await addColumnIfMissing('reservations', 'payment_method', "payment_method VARCHAR(20) NOT NULL DEFAULT 'none'");
     await addColumnIfMissing('reservations', 'payment_status', "payment_status VARCHAR(20) NOT NULL DEFAULT 'pending'");
     await addColumnIfMissing('reservations', 'amount', 'amount NUMERIC(10,2) NOT NULL DEFAULT 0');
@@ -153,6 +156,8 @@ async function initialize() {
     await addColumnIfMissing('reservations', 'razorpay_signature', 'razorpay_signature VARCHAR(255) NULL');
     await addColumnIfMissing('food_listings', 'latitude', 'latitude NUMERIC(10, 7) NULL');
     await addColumnIfMissing('food_listings', 'longitude', 'longitude NUMERIC(10, 7) NULL');
+    await addColumnIfMissing('food_listings', 'dietary_preferences', "dietary_preferences JSONB DEFAULT '[]'");
+    await addColumnIfMissing('users', 'avatar_url', 'avatar_url VARCHAR(255) NULL');
     const indexes = [
         'CREATE INDEX IF NOT EXISTS idx_food_listings_status ON food_listings(status)',
         'CREATE INDEX IF NOT EXISTS idx_food_listings_user ON food_listings(user_id)',
@@ -167,6 +172,7 @@ async function initialize() {
         'CREATE INDEX IF NOT EXISTS idx_watchlists_user ON watchlists(user_id)',
         'CREATE INDEX IF NOT EXISTS idx_forum_posts_category ON forum_posts(category_id)',
         'CREATE INDEX IF NOT EXISTS idx_forum_replies_post ON forum_replies(post_id)',
+        "CREATE INDEX IF NOT EXISTS idx_food_listings_search ON food_listings USING GIN (to_tsvector('english', title || ' ' || COALESCE(description, '') || ' ' || category))",
     ];
     for (const sql of indexes) {
         try {

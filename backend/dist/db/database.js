@@ -10,7 +10,19 @@ function formatQuery(sql, params) {
     if (!Array.isArray(params) || params.length === 0)
         return sql;
     let i = 0;
-    return sql.replace(/\?/g, () => `$${++i}`);
+    let inString = false;
+    let result = '';
+    for (let char of sql) {
+        if (char === "'")
+            inString = !inString;
+        if (char === '?' && !inString) {
+            result += `$${++i}`;
+        }
+        else {
+            result += char;
+        }
+    }
+    return result;
 }
 function buildConfig() {
     if (process.env.DATABASE_URL) {

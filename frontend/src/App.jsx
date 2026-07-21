@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
+import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './components/AuthContext';
 import { ToastProvider } from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmDialog';
@@ -31,45 +32,47 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <ConfirmProvider>
-            <FavoritesProvider>
-              <ErrorBoundary>
-            <div className="min-h-screen bg-white text-text flex flex-col">
-              <Navbar />
-              <main id="main-content" className="flex-1">
-                <Suspense fallback={<div className="flex h-[50vh] items-center justify-center"><div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin"></div></div>}>
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/reset-password" element={<ResetPassword />} />
-                    <Route path="/browse" element={<BrowseFood />} />
-                    <Route path="/food/:id" element={<FoodDetail />} />
-                    <Route path="/saved" element={<SavedListings />} />
-                    <Route path="/impact" element={<Impact />} />
-                    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                    <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                    <Route path="/list-food" element={<ProtectedRoute roles={['donor']}><ListFood /></ProtectedRoute>} />
-                    <Route path="/edit-food/:id" element={<ProtectedRoute roles={['donor']}><EditFood /></ProtectedRoute>} />
-                    <Route path="/watchlists" element={<ProtectedRoute roles={['ngo', 'volunteer']}><Watchlists /></ProtectedRoute>} />
-                    <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
-                    <Route path="/forum/:categoryId" element={<ProtectedRoute><ForumCategory /></ProtectedRoute>} />
-                    <Route path="/forum/post/:postId" element={<ProtectedRoute><ForumPost /></ProtectedRoute>} />
-                    <Route path="/admin/dashboard" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
-              </main>
-              <Footer />
-            </div>
-          </ErrorBoundary>
-            </FavoritesProvider>
-          </ConfirmProvider>
-        </ToastProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <HelmetProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <FavoritesProvider>
+                <ErrorBoundary>
+                  <div className="min-h-screen bg-white text-text flex flex-col">
+                    <Navbar />
+                    <main id="main-content" className="flex-1">
+                      <Suspense fallback={<div className="flex h-[50vh] items-center justify-center"><div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin"></div></div>}>
+                        <Routes>
+                          <Route path="/" element={<Home />} />
+                          <Route path="/login" element={<Login />} />
+                          <Route path="/register" element={<Register />} />
+                          <Route path="/reset-password" element={<ResetPassword />} />
+                          <Route path="/browse" element={<BrowseFood />} />
+                          <Route path="/food/:id" element={<FoodDetail />} />
+                          <Route path="/saved" element={<SavedListings />} />
+                          <Route path="/impact" element={<Impact />} />
+                          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                          <Route path="/list-food" element={<ProtectedRoute roles={['donor']}><ListFood /></ProtectedRoute>} />
+                          <Route path="/edit-food/:id" element={<ProtectedRoute roles={['donor']}><EditFood /></ProtectedRoute>} />
+                          <Route path="/watchlists" element={<ProtectedRoute roles={['ngo', 'volunteer']}><Watchlists /></ProtectedRoute>} />
+                          <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+                          <Route path="/forum/:categoryId" element={<ProtectedRoute><ForumCategory /></ProtectedRoute>} />
+                          <Route path="/forum/post/:postId" element={<ProtectedRoute><ForumPost /></ProtectedRoute>} />
+                          <Route path="/admin/dashboard" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </Suspense>
+                    </main>
+                    <Footer />
+                  </div>
+                </ErrorBoundary>
+              </FavoritesProvider>
+            </ConfirmProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </HelmetProvider>
   );
 }
