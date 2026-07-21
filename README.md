@@ -6,11 +6,12 @@ A full-stack food redistribution platform connecting surplus food donors with NG
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 19 + Vite + Tailwind CSS 4 |
-| Backend | Node.js + Express 4 |
-| Database | PostgreSQL |
+| Frontend | React 19 + Vite + Tailwind CSS 4 + Recharts |
+| Backend | Node.js + Express 4 + Socket.io |
+| Database | PostgreSQL (with Full Text Search) |
 | Image Hosting | Cloudinary |
-| Auth | JWT (bcryptjs) |
+| Auth & Security | JWT (bcryptjs) + 2FA (TOTP) + Helmet + Express Rate Limit |
+| Email & i18n | SendGrid (fallback to Nodemailer) + i18next (English & Spanish) |
 
 ## Project Structure
 
@@ -72,6 +73,12 @@ The frontend dev server proxies `/api` requests to `http://localhost:5000`.
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret |
 | `RAZORPAY_KEY_ID` | Razorpay key ID (test keys start with `rzp_test_`) |
 | `RAZORPAY_KEY_SECRET` | Razorpay key secret |
+| `SENDGRID_API_KEY` | SendGrid API key (Option A for Emails) |
+| `SMTP_HOST` | SMTP Host (Option B for Emails - Fallback/Local testing) |
+| `SMTP_PORT` | SMTP Port |
+| `SMTP_USER` | SMTP Username/Email |
+| `SMTP_PASS` | SMTP App Password |
+| `SMTP_FROM` | Sender Name & Address (e.g., `"Left2Serve" <no-reply@left2serve.com>`) |
 
 ## Features
 
@@ -118,19 +125,26 @@ Access is enforced on **both** the API (authoritative) and the UI (route guards 
 - **Rate limiting** — global API limiter plus a stricter limiter on `/api/auth/login`, `/api/auth/register`, and `/api/admin/login`.
 
 ### Core Features
+- **PWA (Progressive Web App)** — Installable on mobile/desktop, offline-capable service worker.
+- **i18n Localization** — Fully translated in English and Spanish with a dynamic toggle.
+- **Two-Factor Authentication (2FA)** — Time-based One-Time Password (TOTP) integration using standard authenticator apps.
+- **Live Chat (Socket.io)** — Real-time messaging between donors and receivers tied to active reservations.
+- **Advanced Admin Analytics** — Interactive `recharts` for activity trends and food distribution visualizations.
+- **Robust Email System** — Native SendGrid integration with seamless fallback to standard SMTP transport.
 - Food listing with image uploads (Cloudinary)
 - Real-time listing status (available → reserved → collected)
 - **Partial-quantity reservations** — a single large listing can serve multiple receivers; the listing stays available until its quantity is fully claimed, with a live "X available" count
 - Order tracking with visual step indicators
 - Role-based dashboards with statistics
 - In-app notifications with unread badge (reservation lifecycle events)
-- Automatic expiry sweep — expired listings are hidden and marked expired
-- Server-side search, filtering, sorting, and pagination on listings
+- **Automated Cron Jobs** — Automatic expiry sweeps and system maintenance tasks running securely in the background.
+- **Full Text Search (FTS)** — Highly optimized, indexed PostgreSQL text search across listings.
 - **Reviews & ratings** — after a completed pickup, donors and receivers rate each other (1–5 stars + comment); average ratings appear on listings and profiles
 - **Impact tracking** — global impact report (`/impact`) and per-user impact (meals saved, CO₂e avoided, water saved, tree-years) on the profile
 - **Donor self-close** — record an offline/self-handled donation by marking an available listing as donated
-- Admin panel with full CRUD oversight, user management (role change, suspend, delete, **password reset**), listing moderation (**delete**), and activity trends
-- Responsive design with premium UI
+- Admin panel with full CRUD oversight, user management (role change, suspend, delete, password reset), listing moderation, and activity trends
+- SEO-optimized with React Helmet Async
+- Premium responsive design with rich animations
 
 ## API Endpoints
 
