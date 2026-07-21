@@ -112,31 +112,33 @@ export default function Home() {
                 <Link to="/register" className="btn-primary ripple-effect">Get Started Free</Link>
                 <Link to="/browse" className="btn-outline">Browse Listings</Link>
               </div>
-              <div className="flex gap-8 mt-10 pt-8 border-t border-border">
-                <AnimatedStat value={stats.mealsSaved} label="Meals Saved" />
-                <AnimatedStat value={stats.totalDonors} label="Active Donors" />
-                <AnimatedStat value={stats.totalReceivers} label="Receivers" />
-              </div>
-              
-              {showNotice && !serverAwake && (
-                <div role="status" aria-live="polite" className="mt-8 p-4 rounded-2xl bg-gradient-to-r from-accent/[0.08] to-transparent border border-accent/20 backdrop-blur-md relative overflow-hidden flex items-start gap-4 shadow-sm animate-fade-in">
-                  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-accent"></div>
-                  <div className="flex-shrink-0 mt-0.5">
-                    <span className="relative flex h-3.5 w-3.5" aria-hidden="true">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-accent"></span>
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-text text-sm mb-1 flex items-center gap-2">
-                      Connecting to Database <span className="text-[10px] font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20 uppercase tracking-wider">Free Tier</span>
-                    </h4>
-                    <p className="text-xs text-subtle leading-relaxed max-w-sm">
-                      Our backend is waking up from inactivity. It may take a few moments. Statistics will update automatically once live.
-                    </p>
-                  </div>
+              <div className="relative">
+                <div className="flex gap-8 mt-10 pt-8 border-t border-border">
+                  <AnimatedStat value={stats.mealsSaved} label="Meals Saved" />
+                  <AnimatedStat value={stats.totalDonors} label="Active Donors" />
+                  <AnimatedStat value={stats.totalReceivers} label="Receivers" />
                 </div>
-              )}
+                
+                {showNotice && !serverAwake && (
+                  <div role="status" aria-live="polite" className="absolute top-full left-0 mt-6 p-4 rounded-2xl bg-gradient-to-r from-accent/[0.08] to-transparent border border-accent/20 backdrop-blur-md overflow-hidden flex items-start gap-4 shadow-sm animate-fade-in z-20">
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-accent"></div>
+                    <div className="flex-shrink-0 mt-0.5">
+                      <span className="relative flex h-3.5 w-3.5" aria-hidden="true">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-accent"></span>
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-text text-sm mb-1 flex items-center gap-2">
+                        Connecting to Database <span className="text-[10px] font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20 uppercase tracking-wider">Free Tier</span>
+                      </h4>
+                      <p className="text-xs text-subtle leading-relaxed max-w-sm">
+                        Our backend is waking up from inactivity. It may take a few moments. Statistics will update automatically once live.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="reveal-right relative flex justify-center">
               <div className="relative w-80 h-80 lg:w-96 lg:h-96">
