@@ -130,7 +130,7 @@ export default function Navbar() {
                     </>
                   )}
                   <Link to="/profile" onClick={closeMobile} className="block px-4 py-3 rounded-xl text-sm font-semibold transition-all text-subtle hover:text-accent hover:bg-accent/3">{t('navbar.profile')}</Link>
-                  <button onClick={handleLogout} className="block w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 transition-all">{t('navbar.logout')}</button>
+                  <button onClick={handleLogout} className="block w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/10 transition-all">{t('navbar.logout')}</button>
                 </>
               ) : (
                 <>

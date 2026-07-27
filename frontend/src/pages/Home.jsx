@@ -145,7 +145,7 @@ export default function Home() {
             <div className="reveal-right relative flex justify-center">
               <div className="relative w-80 h-80 lg:w-96 lg:h-96">
                 <div className="absolute inset-0 bg-gradient-to-br from-accent to-accent-dark rounded-3xl opacity-10 animate-float" style={{ animationDelay: '0.8s' }} />
-                <div className="absolute inset-4 bg-white rounded-2xl flex items-center justify-center shadow-xl border border-border hover-glow group">
+                <div className="absolute inset-4 bg-surface rounded-2xl flex items-center justify-center shadow-xl border border-border hover-glow group">
                   <div className="text-center">
                     <div className="text-7xl mb-4 group-hover-rotate">🍽️</div>
                     <div className="gradient-text-static text-2xl font-bold">Left2Serve</div>

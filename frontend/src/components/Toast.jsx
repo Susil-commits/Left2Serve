@@ -24,9 +24,11 @@ export function ToastProvider({ children }) {
         {toasts.map(toast => (
           <div key={toast.id}
             className={`pointer-events-auto animate-slide-up flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-lg border text-sm font-semibold max-w-sm ${
-              toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-              toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
-              'bg-white border-border text-text'
+              toast.type === 'success'
+                ? 'bg-emerald-600/10 border-emerald-500/20 text-emerald-400 dark:bg-emerald-500/15 dark:border-emerald-400/20 dark:text-emerald-300'
+                : toast.type === 'error'
+                ? 'bg-red-600/10 border-red-500/20 text-red-500 dark:bg-red-500/15 dark:border-red-400/20 dark:text-red-300'
+                : 'bg-surface border-border text-text'
             }`}>
             {toast.type === 'success' && <svg className="w-5 h-5 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
             {toast.type === 'error' && <svg className="w-5 h-5 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}

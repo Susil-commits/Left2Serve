@@ -43,7 +43,7 @@ export default function App() {
                 <FavoritesProvider>
                   <ErrorBoundary>
                     <PushNotificationManager />
-                    <div className="min-h-screen bg-white text-text flex flex-col">
+                    <div className="min-h-screen bg-surface text-text flex flex-col">
                       <Navbar />
                       <main id="main-content" className="flex-1">
                         <Suspense fallback={<div className="flex h-[50vh] items-center justify-center"><div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin"></div></div>}>

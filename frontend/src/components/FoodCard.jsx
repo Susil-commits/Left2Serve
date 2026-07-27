@@ -30,7 +30,7 @@ export default function FoodCard({ listing }) {
     >
       <Link to={`/food/${listing.id}`} className="block group">
       <div className="premium-card overflow-hidden card-hover-lift">
-        <div className="h-52 bg-gray-50 relative overflow-hidden">
+        <div className="h-52 bg-surface relative overflow-hidden" style={{ background: 'var(--theme-surface-raised)' }}>
           {imageUrl ? (
             <img src={imageUrl} alt={listing.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
           ) : (
@@ -53,10 +53,10 @@ export default function FoodCard({ listing }) {
           {listing.dietary_preferences && listing.dietary_preferences.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
               {listing.dietary_preferences.slice(0, 3).map(tag => (
-                <span key={tag} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold uppercase tracking-wider">{tag}</span>
+                <span key={tag} className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded text-[9px] font-bold uppercase tracking-wider">{tag}</span>
               ))}
               {listing.dietary_preferences.length > 3 && (
-                <span className="px-1.5 py-0.5 bg-gray-100 text-subtle rounded text-[9px] font-bold uppercase tracking-wider">+{listing.dietary_preferences.length - 3}</span>
+                <span className="px-1.5 py-0.5 bg-border text-muted rounded text-[9px] font-bold uppercase tracking-wider">+{listing.dietary_preferences.length - 3}</span>
               )}
             </div>
           )}
