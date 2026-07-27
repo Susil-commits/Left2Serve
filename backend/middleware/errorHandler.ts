@@ -29,6 +29,20 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
     });
   }
 
+  // Handle PostgreSQL specific errors securely
+  if (err?.code) {
+    switch (err.code) {
+      case '23505': // unique_violation
+        return res.status(409).json({ error: 'A record with this value already exists.' });
+      case '23503': // foreign_key_violation
+        return res.status(400).json({ error: 'Referenced record does not exist.' });
+      case '22P02': // invalid_text_representation
+        return res.status(400).json({ error: 'Invalid input format.' });
+      case '23502': // not_null_violation
+        return res.status(400).json({ error: 'Missing required field.' });
+    }
+  }
+
   // Unhandled / Programming Errors
   const isProduction = process.env.NODE_ENV === 'production';
   return res.status(statusCode).json({

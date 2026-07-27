@@ -1,12 +1,24 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { get, all, run, insert } from '../db/database.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateIdParam } from '../middleware/validateParam.js';
+import { validate } from '../middleware/validate.js';
+import { cacheMiddleware } from '../utils/cache.js';
 
 const router = Router();
 
+const postSchema = z.object({
+  title: z.string().min(2, 'Title is too short').max(200, 'Title is too long'),
+  content: z.string().min(2, 'Content is too short').max(5000, 'Content is too long'),
+});
+
+const replySchema = z.object({
+  content: z.string().min(2, 'Content is too short').max(3000, 'Content is too long'),
+});
+
 // GET all categories accessible to user
-router.get('/categories', authMiddleware, async (req: Request, res: Response): Promise<any> => {
+router.get('/categories', authMiddleware, cacheMiddleware(300), async (req: Request, res: Response): Promise<any> => {
   try {
     const role = req.user!.role;
     const categories = await all('SELECT * FROM forum_categories ORDER BY id ASC');
@@ -24,7 +36,7 @@ router.get('/categories', authMiddleware, async (req: Request, res: Response): P
 });
 
 // GET posts in a category
-router.get('/categories/:id/posts', authMiddleware, validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
+router.get('/categories/:id/posts', authMiddleware, cacheMiddleware(60), validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
   try {
     const category = await get('SELECT * FROM forum_categories WHERE id = ?', [req.params.id]);
     if (!category) return res.status(404).json({ error: 'Category not found' });
@@ -52,9 +64,8 @@ router.get('/categories/:id/posts', authMiddleware, validateIdParam('id'), async
 });
 
 // POST new post in a category
-router.post('/categories/:id/posts', authMiddleware, validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
+router.post('/categories/:id/posts', authMiddleware, validateIdParam('id'), validate(postSchema), async (req: Request, res: Response): Promise<any> => {
   const { title, content } = req.body;
-  if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
   
   try {
     const category = await get('SELECT * FROM forum_categories WHERE id = ?', [req.params.id]);
@@ -116,9 +127,8 @@ router.get('/posts/:id', authMiddleware, validateIdParam('id'), async (req: Requ
 });
 
 // POST reply to a post
-router.post('/posts/:id/replies', authMiddleware, validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
+router.post('/posts/:id/replies', authMiddleware, validateIdParam('id'), validate(replySchema), async (req: Request, res: Response): Promise<any> => {
   const { content } = req.body;
-  if (!content) return res.status(400).json({ error: 'Content is required' });
   
   try {
     const post = await get(`
@@ -156,9 +166,8 @@ router.post('/posts/:id/replies', authMiddleware, validateIdParam('id'), async (
 });
 
 // PUT edit reply
-router.put('/replies/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
+router.put('/replies/:id', authMiddleware, validateIdParam('id'), validate(replySchema), async (req: Request, res: Response): Promise<any> => {
   const { content } = req.body;
-  if (!content) return res.status(400).json({ error: 'Content is required' });
   
   try {
     const reply = await get('SELECT * FROM forum_replies WHERE id = ?', [req.params.id]);
@@ -200,7 +209,7 @@ router.delete('/replies/:id', authMiddleware, validateIdParam('id'), async (req:
 });
 
 // PUT edit post
-router.put('/posts/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
+router.put('/posts/:id', authMiddleware, validateIdParam('id'), validate(postSchema), async (req: Request, res: Response): Promise<any> => {
   const { title, content } = req.body;
   
   try {

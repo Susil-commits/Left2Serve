@@ -176,6 +176,12 @@ async function initialize() {
   await addColumnIfMissing('food_listings', 'longitude', 'longitude NUMERIC(10, 7) NULL');
   await addColumnIfMissing('food_listings', 'dietary_preferences', "dietary_preferences JSONB DEFAULT '[]'");
   await addColumnIfMissing('users', 'avatar_url', 'avatar_url VARCHAR(255) NULL');
+  await addColumnIfMissing('users', 'badges', "badges JSONB DEFAULT '[]'");
+  await addColumnIfMissing('users', 'meals_saved', 'meals_saved INT DEFAULT 0');
+  await addColumnIfMissing('users', 'push_subscriptions', "push_subscriptions JSONB DEFAULT '[]'");
+  await addColumnIfMissing('food_listings', 'has_safety_checklist', 'has_safety_checklist BOOLEAN DEFAULT FALSE');
+  await addColumnIfMissing('food_listings', 'is_template', 'is_template BOOLEAN DEFAULT FALSE');
+  await addColumnIfMissing('reservations', 'agreed_to_waiver', 'agreed_to_waiver BOOLEAN DEFAULT FALSE');
 
   const indexes = [
     'CREATE INDEX IF NOT EXISTS idx_food_listings_status ON food_listings(status)',

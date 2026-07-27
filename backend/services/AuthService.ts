@@ -132,7 +132,7 @@ export class AuthService {
   }
 
   static async getMe(userId: number) {
-    const user = await get('SELECT id, name, email, role, phone, address, organization, avatar_url, two_factor_enabled, created_at FROM users WHERE id = ?', [userId]);
+    const user = await get('SELECT id, name, email, role, phone, address, organization, avatar_url, two_factor_enabled, badges, meals_saved, created_at FROM users WHERE id = ?', [userId]);
     if (!user) throw new AppError(404, 'User not found');
     return user;
   }

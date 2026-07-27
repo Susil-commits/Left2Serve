@@ -3,6 +3,7 @@ import { getAvailability, recomputeListingStatus } from '../db/availability.js';
 import { createNotification } from '../db/notify.js';
 import { sendReservationApprovedEmail, sendOrderUpdateEmail, sendOrderCancelledEmail } from '../utils/email.js';
 import { AppError } from '../utils/AppError.js';
+import { BadgeService } from './BadgeService.js';
 
 export class ReservationService {
   static async createReservation(userId: number, payload: any) {
@@ -81,6 +82,7 @@ export class ReservationService {
 
     await run("UPDATE reservations SET status = 'collected' WHERE id = ?", [reservation.id]);
     await recomputeListingStatus(reservation.food_listing_id);
+    await BadgeService.addMealsAndCheckBadges(listing.user_id, reservation.quantity);
 
     const updated = await get('SELECT * FROM reservations WHERE id = ?', [reservation.id]);
     const ctx = { reservationId: reservation.id, listingId: reservation.food_listing_id };
@@ -109,9 +111,13 @@ export class ReservationService {
 
     await run('UPDATE reservations SET status = ? WHERE id = ?', [status, reservationId]);
     await recomputeListingStatus(reservation.food_listing_id);
+    const info = await get('SELECT title, user_id, pickup_address FROM food_listings WHERE id = ?', [reservation.food_listing_id]);
+    
+    if (status === 'collected') {
+      await BadgeService.addMealsAndCheckBadges(info?.user_id, reservation.quantity);
+    }
 
     const updated = await get('SELECT * FROM reservations WHERE id = ?', [reservationId]);
-    const info = await get('SELECT title, user_id, pickup_address FROM food_listings WHERE id = ?', [reservation.food_listing_id]);
     
     const ctx = { reservationId: reservation.id, listingId: reservation.food_listing_id };
     const reserver = await get('SELECT name, email FROM users WHERE id = ?', [reservation.user_id]);

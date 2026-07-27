@@ -8,6 +8,7 @@ import { validateIdParam } from '../middleware/validateParam.js';
 import { createNotification } from '../db/notify.js';
 import { audit } from '../db/audit.js';
 import { recomputeListingStatus } from '../db/availability.js';
+import { cacheMiddleware } from '../utils/cache.js';
 
 const router = Router();
 const ADMIN_CODE = process.env.ADMIN_CODE;
@@ -26,7 +27,7 @@ router.post('/login', async (req: Request, res: Response) => {
   res.json({ token, user: { id: 0, name: 'Administrator', email: 'admin@left2serve.com', role: 'admin' } });
 });
 
-router.get('/stats', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
+router.get('/stats', authMiddleware, roleMiddleware('admin'), cacheMiddleware(60), async (req: Request, res: Response) => {
   try {
     const [usersRow] = await all('SELECT COUNT(*) as count FROM users');
     const [ngosRow] = await all("SELECT COUNT(*) as count FROM users WHERE role = 'ngo'");
@@ -243,6 +244,51 @@ router.get('/audit-log', authMiddleware, roleMiddleware('admin'), async (req: Re
     res.json(logs);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch audit log' });
+  }
+});
+
+router.get('/export', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
+  try {
+    const type = req.query.type as string;
+    if (!['users', 'listings', 'reservations'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid export type. Must be users, listings, or reservations.' });
+    }
+
+    let data: any[] = [];
+    if (type === 'users') {
+      data = await all('SELECT id, name, email, role, phone, organization, is_active, created_at FROM users ORDER BY created_at DESC');
+    } else if (type === 'listings') {
+      data = await all('SELECT id, user_id, title, category, quantity, status, created_at FROM food_listings ORDER BY created_at DESC');
+    } else if (type === 'reservations') {
+      data = await all('SELECT id, food_listing_id, user_id, quantity, status, payment_method, amount, created_at FROM reservations ORDER BY created_at DESC');
+    }
+
+    if (data.length === 0) {
+      return res.status(404).send('No data found');
+    }
+
+    const headers = Object.keys(data[0]);
+    const csvRows = [];
+    csvRows.push(headers.join(','));
+    for (const row of data) {
+      const values = headers.map(header => {
+        const val = row[header];
+        if (val === null || val === undefined) return '';
+        const str = String(val).replace(/"/g, '""');
+        if (str.includes(',') || str.includes('\\n') || str.includes('"')) return `"${str}"`;
+        return str;
+      });
+      csvRows.push(values.join(','));
+    }
+
+    const csvData = csvRows.join('\\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=export_${type}_${new Date().getTime()}.csv`);
+    res.send(csvData);
+
+    await adminAudit(req, 'csv_export', 'export', 0, `Exported ${type} to CSV`);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate CSV export' });
   }
 });
 

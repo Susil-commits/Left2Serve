@@ -9,6 +9,8 @@ let pool: Pool | null = null;
 
 // Convert MySQL-style "?" placeholders into PostgreSQL "$N" placeholders so the
 // route files can keep using the familiar "?" syntax without per-query renumbering.
+// WARNING: This is a simple parser. It ignores `?` inside single quotes, but will fail
+// if you use double quotes containing `?` or PostgreSQL JSON operators like `?|` or `?&`.
 function formatQuery(sql: string, params: any[]): string {
   if (!Array.isArray(params) || params.length === 0) return sql;
   let i = 0;

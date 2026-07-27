@@ -12,7 +12,9 @@ export const cacheMiddleware = (durationSecs: number) => {
       return next();
     }
 
-    const key = `__express__${req.originalUrl || req.url}`;
+    // Include role in cache key to prevent leaking higher-privilege data to lower-privilege users
+    const roleKey = (req as any).user?.role ? `_${(req as any).user.role}` : '';
+    const key = `__express__${req.originalUrl || req.url}${roleKey}`;
     const cachedResponse = cache.get(key);
 
     if (cachedResponse) {
