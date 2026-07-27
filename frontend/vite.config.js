@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'favicon.svg'],
       manifest: {
         name: 'Left2Serve',
         short_name: 'Left2Serve',
@@ -19,6 +19,11 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         icons: [
+          {
+            src: '/pwa-64x64.png',
+            sizes: '64x64',
+            type: 'image/png'
+          },
           {
             src: '/pwa-192x192.png',
             sizes: '192x192',
@@ -30,10 +35,10 @@ export default defineConfig({
             type: 'image/png'
           },
           {
-            src: '/pwa-512x512.png',
+            src: '/maskable-icon-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'maskable'
           }
         ]
       }
