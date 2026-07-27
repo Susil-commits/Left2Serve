@@ -4,10 +4,20 @@ import { api } from '../api';
 import { useToast } from '../components/Toast';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import StarRating from '../components/StarRating';
+import { useTranslation } from 'react-i18next';
+
+const BADGE_TIERS = {
+  bronze: { name: 'Bronze Donor', icon: '🥉', desc: '10+ meals saved' },
+  silver: { name: 'Silver Donor', icon: '🥈', desc: '50+ meals saved' },
+  gold: { name: 'Gold Donor', icon: '🥇', desc: '100+ meals saved' },
+  platinum: { name: 'Platinum Donor', icon: '💎', desc: '500+ meals saved' },
+  eco_hero: { name: 'Eco Hero', icon: '🌍', desc: '1000+ meals saved' },
+};
 
 export default function Profile() {
   const { user, updateUser, changePassword } = useAuth();
   const { addToast } = useToast();
+  const { t } = useTranslation();
   const [form, setForm] = useState(() => ({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -137,10 +147,18 @@ export default function Profile() {
         setForm({ ...form, avatar_url: res.urls[0] });
         addToast('Avatar uploaded, click Save Changes to apply', 'success');
       }
-    } catch (err) {
+    } catch {
       addToast('Failed to upload avatar', 'error');
     }
     setLoading(false);
+  };
+
+  const handleShareTwitter = () => {
+    if (!impact) return;
+    const isDonor = impact.role === 'donor';
+    const meals = isDonor ? impact.mealsDonated : impact.mealsReceived;
+    const text = `I just helped save ${meals} meals and prevented ${impact.co2Kg}kg of CO2 emissions with Left2Serve! Join the movement to end food waste. 🌍💚 #Left2Serve #FoodWaste #Sustainability`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const roleIcons = { donor: '🏪', ngo: '🏛️', volunteer: '🙋', admin: '🛡️' };
@@ -149,7 +167,7 @@ export default function Profile() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 page-transition">
       <div className="mb-8 animate-fade-in">
-        <h1 className="text-4xl font-black tracking-tight text-text mb-2">My Profile</h1>
+        <h1 className="text-4xl font-black tracking-tight text-text mb-2">{t('profile.title')}</h1>
         <p className="text-subtle">Manage your account information</p>
       </div>
 
@@ -170,6 +188,17 @@ export default function Profile() {
             </div>
             <p className="text-sm text-muted mt-1">{user?.email}</p>
             <p className="text-xs text-muted mt-1">Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : '—'}</p>
+            
+            {user?.badges && Array.isArray(user.badges) && user.badges.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {user.badges.map(b => BADGE_TIERS[b] && (
+                  <div key={b} className="flex items-center gap-1.5 px-2.5 py-1 bg-accent/10 text-accent-dark rounded-full text-xs font-bold border border-accent/20" title={BADGE_TIERS[b].desc}>
+                    <span>{BADGE_TIERS[b].icon}</span>
+                    <span>{BADGE_TIERS[b].name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -191,7 +220,7 @@ export default function Profile() {
             </div>
             <button onClick={() => setEditing(true)} className="btn-primary w-full !py-3 !rounded-2xl text-base">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              Edit Profile
+              {t('profile.edit_profile')}
             </button>
           </div>
         ) : (
@@ -210,27 +239,27 @@ export default function Profile() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-text mb-2">Full Name</label>
+              <label className="block text-sm font-semibold text-text mb-2">{t('profile.name')}</label>
               <input type="text" value={form.name} onChange={update('name')} required className="input-field" placeholder="Your name" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-text mb-2">Phone</label>
+                <label className="block text-sm font-semibold text-text mb-2">{t('profile.phone')}</label>
                 <input type="tel" value={form.phone} onChange={update('phone')} className="input-field" placeholder="+1 234 567 890" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-text mb-2">Organization</label>
+                <label className="block text-sm font-semibold text-text mb-2">{t('profile.organization')}</label>
                 <input type="text" value={form.organization} onChange={update('organization')} className="input-field" placeholder="Your organization" />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-text mb-2">Address</label>
+              <label className="block text-sm font-semibold text-text mb-2">{t('profile.address')}</label>
               <input type="text" value={form.address} onChange={update('address')} className="input-field" placeholder="Your address" />
             </div>
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={() => setEditing(false)} className="btn-outline flex-1 !py-3 !rounded-2xl">Cancel</button>
               <button type="submit" disabled={loading} className="btn-primary flex-1 !py-3 !rounded-2xl text-base">
-                {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</span> : 'Save Changes'}
+                {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</span> : t('profile.save_changes')}
               </button>
             </div>
           </form>
@@ -239,9 +268,15 @@ export default function Profile() {
 
       {impact && (
         <div className="premium-card-elevated p-6 sm:p-8 mt-6 animate-fade-in-up">
-          <div className="flex items-center gap-2 mb-5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <h3 className="text-lg font-bold text-text">Your Impact</h3>
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <h3 className="text-lg font-bold text-text">Your Impact</h3>
+            </div>
+            <button onClick={handleShareTwitter} className="bg-[#1DA1F2]/10 text-[#1DA1F2] hover:bg-[#1DA1F2]/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>
+              Share Impact
+            </button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {impact.role === 'donor' ? (

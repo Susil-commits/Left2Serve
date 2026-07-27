@@ -38,6 +38,7 @@ export default function FoodDetail() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [donorRating, setDonorRating] = useState(null);
   const [closing, setClosing] = useState(false);
+  const [agreedToWaiver, setAgreedToWaiver] = useState(false);
 
   const loadListing = useCallback(async () => {
     try {
@@ -75,7 +76,7 @@ export default function FoodDetail() {
         setMessage(result.success ? 'Payment successful! Reservation confirmed.' : 'Reservation confirmed!');
         addToast('Payment successful & food reserved', 'success');
       } else {
-        await api.reservations.create({ food_listing_id: listing.id, quantity: parseInt(quantity), pickup_time: pickupTime || null, notes: notes || null, payment_method: isPaid ? paymentMethod : undefined });
+        await api.reservations.create({ food_listing_id: listing.id, quantity: parseInt(quantity), pickup_time: pickupTime || null, notes: notes || null, payment_method: isPaid ? paymentMethod : undefined, agreed_to_waiver: agreedToWaiver });
         setMessage('Reservation confirmed!');
         addToast('Food reserved successfully', 'success');
       }
@@ -333,7 +334,20 @@ export default function FoodDetail() {
                   </div>
                 </div>
               )}
-              <button type="submit" disabled={reserving} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect">
+              <div className="mb-6 p-4 bg-orange-50 rounded-2xl border border-orange-200">
+                <h4 className="text-sm font-bold text-orange-900 flex items-center gap-2 mb-2">
+                  <span className="w-2 h-2 rounded-full bg-orange-500" /> Digital Waiver & Safety Agreement
+                </h4>
+                <p className="text-xs text-orange-800 mb-3 leading-relaxed">
+                  By proceeding with this reservation, I acknowledge that the food provided is surplus or donated and I accept it "as is." 
+                  Left2Serve and the donor make no warranties regarding the food. I assume all risks associated with consumption.
+                </p>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" checked={agreedToWaiver} onChange={(e) => setAgreedToWaiver(e.target.checked)} className="mt-0.5 w-4 h-4 text-accent border-gray-300 rounded focus:ring-accent" />
+                  <span className="text-xs font-semibold text-orange-900 leading-tight">I have read, understood, and agree to the waiver terms. <span className="text-accent">*</span></span>
+                </label>
+              </div>
+              <button type="submit" disabled={reserving || !agreedToWaiver} className="btn-primary w-full !py-3 !rounded-2xl text-base ripple-effect disabled:opacity-50 disabled:cursor-not-allowed">
                 {reserving ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing...</span> : (isPaid && paymentMethod === 'razorpay' ? `Pay ₹${total.toFixed(2)} & Reserve` : 'Confirm Reservation')}
               </button>
             </form>

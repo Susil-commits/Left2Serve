@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
-import { API_BASE_URL, api } from '../api';
+import { api } from '../api';
 
 export default function Login() {
   const [searchParams] = useSearchParams();

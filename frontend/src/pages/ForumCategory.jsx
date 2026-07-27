@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../components/AuthContext';
 
 export default function ForumCategory() {
   const { categoryId } = useParams();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [data, setData] = useState({ category: null, posts: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -75,7 +74,8 @@ export default function ForumCategory() {
   try {
     const roles = typeof category.write_roles === 'string' ? JSON.parse(category.write_roles) : category.write_roles;
     canWrite = roles.includes(user.role);
-  } catch { }
+    // eslint-disable-next-line no-unused-vars
+  } catch (err) { /* ignore */ }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-transition">

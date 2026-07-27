@@ -12,6 +12,14 @@ import QRScanner from '../components/QRScanner';
 import DonorAnalytics from '../components/DonorAnalytics';
 import { useTranslation } from 'react-i18next';
 
+const BADGE_TIERS = {
+  bronze: { name: 'Bronze Donor', icon: '🥉', desc: '10+ meals saved' },
+  silver: { name: 'Silver Donor', icon: '🥈', desc: '50+ meals saved' },
+  gold: { name: 'Gold Donor', icon: '🥇', desc: '100+ meals saved' },
+  platinum: { name: 'Platinum Donor', icon: '💎', desc: '500+ meals saved' },
+  eco_hero: { name: 'Eco Hero', icon: '🌍', desc: '1000+ meals saved' },
+};
+
 const statusConfig = {
   available: { cls: 'badge-green', dot: 'bg-emerald-500', label: 'Available' },
   reserved: { cls: 'badge-yellow', dot: 'bg-amber-500', label: 'Reserved' },
@@ -131,15 +139,15 @@ export default function Dashboard() {
 
   const donorStats = [
     { label: t('dashboard.tab_listings'), value: myListings.length, icon: '📋' },
-    { label: 'Available', value: myListings.filter(l => l.status === 'available').length, icon: '🟢' },
-    { label: 'Reserved', value: myListings.filter(l => l.status === 'reserved').length, icon: '📌' },
+    { label: t('dashboard.stats_available'), value: myListings.filter(l => l.status === 'available').length, icon: '🟢' },
+    { label: t('dashboard.stats_reserved'), value: myListings.filter(l => l.status === 'reserved').length, icon: '📌' },
     { label: t('dashboard.stats_collected'), value: myListings.filter(l => l.status === 'collected').length, icon: '📦' },
   ];
 
   const receiverStats = [
     { label: t('dashboard.stats_orders'), value: myReservations.length, icon: '📦' },
     { label: t('dashboard.stats_pending'), value: myReservations.filter(r => r.status === 'pending').length, icon: '⏳' },
-    { label: 'Approved', value: myReservations.filter(r => r.status === 'approved').length, icon: '✅' },
+    { label: t('dashboard.stats_approved'), value: myReservations.filter(r => r.status === 'approved').length, icon: '✅' },
     { label: t('dashboard.stats_collected'), value: myReservations.filter(r => r.status === 'collected').length, icon: '🎉' },
   ];
 
@@ -157,7 +165,18 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent/20 to-accent/10 flex items-center justify-center text-accent text-sm font-bold shadow-sm">{user.name[0]}</div>
           <div>
-            <p className="text-text font-semibold">{user.name}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-text font-semibold">{user.name}</p>
+              {user.badges && Array.isArray(user.badges) && (
+                <div className="flex gap-1">
+                  {user.badges.map(b => BADGE_TIERS[b] && (
+                    <span key={b} title={BADGE_TIERS[b].desc} className="cursor-help">
+                      {BADGE_TIERS[b].icon}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
             <p className="text-subtle text-sm capitalize">{user.role}</p>
           </div>
         </div>
@@ -180,9 +199,9 @@ export default function Dashboard() {
       {user.role === 'donor' && (
         <div className="animate-fade-in-up">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-text">My {t('dashboard.tab_listings')}</h2>
+            <h2 className="text-xl font-bold text-text">{t('dashboard.my_listings')}</h2>
             <Link to="/list-food" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>New Listing
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>{t('dashboard.new_listing')}
             </Link>
           </div>
           {loading ? (
@@ -190,8 +209,8 @@ export default function Dashboard() {
           ) : myListings.length === 0 ? (
             <div className="premium-card p-16 text-center">
               <div className="text-5xl mb-4 opacity-20">📋</div>
-              <p className="text-subtle mb-4 font-medium">No listings yet</p>
-              <Link to="/list-food" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">Create your first listing</Link>
+              <p className="text-subtle mb-4 font-medium">{t('dashboard.no_listings')}</p>
+              <Link to="/list-food" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">{t('dashboard.create_first_listing')}</Link>
             </div>
           ) : (
             <div className="space-y-3">
@@ -289,16 +308,16 @@ export default function Dashboard() {
       {(user.role === 'ngo' || user.role === 'volunteer') && (
         <div className="animate-fade-in-up">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-text">My {t('dashboard.tab_orders')}</h2>
-            <Link to="/browse" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">Browse Food</Link>
+            <h2 className="text-xl font-bold text-text">{t('dashboard.my_orders')}</h2>
+            <Link to="/browse" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">{t('dashboard.browse_food_btn')}</Link>
           </div>
           {loading ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{[1,2,3].map(i => <div key={i} className="skeleton h-44 rounded-2xl" />)}</div>
           ) : myReservations.length === 0 ? (
             <div className="premium-card p-16 text-center">
               <div className="text-5xl mb-4 opacity-20">📦</div>
-              <p className="text-subtle mb-4 font-medium">No orders yet</p>
-              <Link to="/browse" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">Browse available food</Link>
+              <p className="text-subtle mb-4 font-medium">{t('dashboard.no_orders')}</p>
+              <Link to="/browse" className="btn-primary !py-2 !px-4 !text-sm !rounded-xl">{t('dashboard.browse_available')}</Link>
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

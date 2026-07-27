@@ -4,11 +4,7 @@ import { api } from '../api';
 import FoodCard from '../components/FoodCard';
 import Pagination from '../components/Pagination';
 import MapWrapper from '../components/MapWrapper';
-import { io } from 'socket.io-client';
-import { useToast } from '../components/Toast';
 import { useTranslation } from 'react-i18next';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const categories = [
   { value: '', label: 'All', icon: '🌟' },
@@ -21,11 +17,7 @@ const categories = [
 
 const dietaryOptions = ['Vegan', 'Vegetarian', 'Halal', 'Gluten-Free', 'Nut-Free', 'Dairy-Free'];
 
-const sortOptions = [
-  { value: 'newest', label: 'Newest First' },
-  { value: 'expiring', label: 'Expiring Soon' },
-  { value: 'quantity', label: 'Most Quantity' },
-];
+
 
 const LIMIT = 12;
 
@@ -45,19 +37,6 @@ export default function BrowseFood() {
   const [selectedDietary, setSelectedDietary] = useState([]);
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState('list');
-  const { addToast } = useToast();
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    const socket = io(API_BASE_URL, { auth: { token } });
-    socket.on('new_listing', (listing) => {
-      addToast(`New food listing added: ${listing.title}!`, 'info');
-    });
-
-    return () => socket.disconnect();
-  }, [addToast]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -76,10 +55,10 @@ export default function BrowseFood() {
         page,
         limit: LIMIT,
       };
-      if (distance && location) {
-        params.distance = distance;
+      if (location) {
         params.lat = location.lat;
         params.lng = location.lng;
+        if (distance) params.distance = distance;
       }
       const data = await api.listings.getAll(params);
       setListings(data.listings);
