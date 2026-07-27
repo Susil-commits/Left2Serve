@@ -1,280 +1,162 @@
-# Left2Serve
+# Left2Serve 🍲
 
 A full-stack food redistribution platform connecting surplus food donors with NGOs, shelters, and volunteers to reduce food waste and feed communities.
 
-## Tech Stack
+---
+
+## 🌟 Complete Feature List
+
+Left2Serve has been iteratively built to provide a robust, enterprise-grade experience. Here are all the features implemented from start to finish:
+
+### 🎨 UI/UX & Localization
+- **PWA (Progressive Web App)** — Installable on mobile/desktop, offline-capable service worker.
+- **i18n Localization** — Fully translated in English and Spanish across the entire platform, with a dynamic language toggle.
+- **Dark Mode** — Beautiful, seamless dark mode toggle integrated across all UI components via native CSS variables.
+- **Responsive Premium Design** — Polished, modern UI built with Tailwind CSS, featuring glassmorphism, micro-animations, and smooth transitions.
+- **Advanced Map Clustering** — Interactive map view in Browse with clustered markers for dense areas, built on Leaflet.
+- **Order Tracking** — Visual step indicators for reservation lifecycles.
+
+### 🔔 Real-Time & Matchmaking
+- **Live Chat (Socket.io)** — Real-time messaging between donors and receivers tied to active reservations.
+- **Smart Matching Engine** — NGOs and Volunteers can create Watchlists. They are notified automatically when a new listing matches their dietary or category preferences.
+- **Web Push Notifications** — Native browser notifications for real-time matches and reservation updates, running seamlessly alongside in-app toasts.
+- **In-App Notifications** — Notification bell with unread badges tracking the reservation lifecycle events.
+
+### 🏆 Gamification & Impact
+- **Impact Badges** — Donors earn tier-based badges (Bronze, Silver, Gold, Platinum, Eco Hero) as they save more meals, displayed on their profile and dashboard.
+- **Social Media Impact Sharing** — Users can share their impact (meals saved, CO2 avoided) directly to Twitter with a single click.
+- **Impact Tracking Dashboard** — Global impact report (`/impact`) and per-user impact (meals saved, CO₂e avoided, water saved, tree-years).
+- **Reviews & Ratings** — After a completed pickup, donors and receivers rate each other (1–5 stars + comment); average ratings appear on listings and profiles.
+
+### 🛡️ Trust & Safety
+- **Two-Factor Authentication (2FA)** — Time-based One-Time Password (TOTP) integration using standard authenticator apps.
+- **Food Safety Waivers & Checklists** — Donors complete a safety checklist upon listing, and receivers agree to a digital waiver upon reservation, ensuring strict safety standards.
+- **Robust Role Privacy** — Automatic obfuscation of contact details (email/phone) until a transactional relationship is established and approved.
+- **Audit Logs** — Comprehensive logging of admin actions and auth attempts.
+
+### 🍽️ Donor & Listing Tools
+- **Recurring Listing Templates** — Donors can save complex listings as templates and reuse them for quick, one-click repeated donations.
+- **Partial-Quantity Reservations** — A single large listing can serve multiple receivers; the listing stays available until its quantity is fully claimed.
+- **Donor Self-Close** — Record an offline/self-handled donation by manually marking an available listing as donated.
+- **Image Uploads** — Secure, direct-to-cloud image uploads powered by Cloudinary.
+- **Full Text Search (FTS)** — Highly optimized, indexed PostgreSQL text search across listings.
+- **Automated Cron Jobs** — Automatic expiry sweeps moving past-date listings to expired states.
+
+### 📊 Admin & Analytics
+- **Advanced Admin Analytics** — Interactive `recharts` for activity trends and food distribution visualizations.
+- **Comprehensive Admin Panel** — Full CRUD oversight, user management (role change, suspend, delete, password reset), and listing moderation.
+- **Robust Email System** — Native SendGrid integration with seamless fallback to standard SMTP transport.
+
+---
+
+## 🛠️ Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 19 + Vite + Tailwind CSS 4 + Recharts |
+| Frontend | React 19 + Vite + Tailwind CSS 4 + Recharts + React Leaflet |
 | Backend | Node.js + Express 4 + Socket.io |
 | Database | PostgreSQL (with Full Text Search) |
 | Image Hosting | Cloudinary |
 | Auth & Security | JWT (bcryptjs) + 2FA (TOTP) + Helmet + Express Rate Limit |
 | Email & i18n | SendGrid (fallback to Nodemailer) + i18next (English & Spanish) |
 
-## Project Structure
+---
 
-```
+## 📂 Project Structure
+
+```text
 Left2Serve/
 ├── frontend/          React + Vite SPA
 │   └── src/
 │       ├── api/       HTTP client
-│       ├── components/  Auth, Navbar, FoodCard, etc.
-│       └── pages/     Home, Login, Register, Dashboard, etc.
+│       ├── components/  Auth, Navbar, FoodCard, MapWrapper, etc.
+│       └── pages/     Home, Dashboard, ListFood, BrowseFood, Profile, etc.
 └── backend/           Node.js + Express API
-    ├── db/            MySQL connection + schema
-    ├── middleware/     JWT auth + role guards
-    └── routes/        Auth, Listings, Reservations, Admin
+    ├── db/            PostgreSQL connection + migration logic
+    ├── middleware/     JWT auth + role guards + upload config
+    └── routes/        Auth, Listings, Reservations, Admin, Reviews
 ```
 
-## Setup
+---
+
+## 🔐 Role Access & Privacy
+
+Access is enforced on **both** the API (authoritative) and the UI (route guards + conditional rendering). The guiding principle: **personal contact info (phone/email) is only visible within a transactional relationship.**
+
+| Resource / field | Public | Donor | NGO / Volunteer | Admin |
+|---|:--:|:--:|:--:|:--:|
+| Browse listings (title, description, category) | ✅ | ✅ | ✅ | ✅ |
+| Donor name + organization (public attribution) | ✅ | ✅ | ✅ | ✅ |
+| Pickup address + instructions | ✅ | ✅ | ✅ | ✅ |
+| Donor phone number | ❌ | own only | ✅ after **approved** reservation | ✅ |
+| Donor email | ❌ | own only | ❌ | ✅ |
+| Own incoming reservation requests | — | ✅ | — | ✅ |
+| Own outgoing reservations (+ donor phone if apprv'd) | — | — | ✅ | ✅ |
+| Other users' reservations | ❌ | ❌ | ❌ | ✅ |
+| Full user list, roles, suspend/delete | ❌ | ❌ | ❌ | ✅ |
+
+**Enforcement notes:**
+- `GET /api/listings/:id` uses optional auth: donor contact (`phone`) is stripped unless the requester is the owner, an admin, or a receiver with an approved reservation.
+- Route guards (`ProtectedRoute`): `/list-food` is donor-only; `/admin/dashboard` is admin-only; `/dashboard` requires any authenticated user.
+
+---
+
+## 🛡️ Security Posture
+
+- **Token Revocation**: Every JWT carries a `token_version` checked against the DB. Bumping `token_version` (password change or suspension) instantly invalidates all previously issued tokens.
+- **Account Lockout**: 5 failed login attempts locks the account for 15 minutes.
+- **Password Policy**: Min 8 chars, ≥ 3 rules (uppercase, lowercase, digits, symbols). Bcrypt cost factor 12.
+- **Security Headers**: Helmet sets HSTS, `Cross-Origin-Opener-Policy`, and strict CSPs.
+- **Input Validation**: `image_urls` are validated as `https://` Cloudinary URLs.
+- **Rate Limiting**: Global API limiter plus stricter limiters on Auth/Admin routes.
+
+---
+
+## 🚀 Setup & Deployment
 
 ### Prerequisites
 - Node.js 18+
 - PostgreSQL 14+
-- Cloudinary account (for image uploads)
+- Cloudinary account
 
-### Backend
+### Local Development
 
+**1. Backend**
 ```bash
 cd backend
-cp .env.example .env   # edit with your credentials
+cp .env.example .env   # configure DB and Secrets
 npm install
 npm run dev
 ```
 
-### Frontend
-
+**2. Frontend**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-
-The frontend dev server proxies `/api` requests to `http://localhost:5000`.
+*(The frontend dev server proxies `/api` requests to `http://localhost:5000`)*
 
 ### Environment Variables (`backend/.env`)
 
 | Variable | Description |
 |----------|-------------|
 | `PORT` | Server port (default: 5000) |
-| `DATABASE_URL` | PostgreSQL connection string (preferred on Render). If set, the `DB_*` vars below are ignored |
-| `DB_HOST` | PostgreSQL host (used when `DATABASE_URL` is not set) |
-| `DB_PORT` | PostgreSQL port (default: 5432) |
-| `DB_USER` | PostgreSQL user |
-| `DB_PASSWORD` | PostgreSQL password |
-| `DB_NAME` | Database name |
-| `DB_SSL` | Set to `1` if the host requires SSL (Render external URL, PlanetScale, etc.) |
-| `JWT_SECRET` | JWT signing secret — **required**, must be ≥ 16 chars (server refuses to start otherwise) |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | JWT signing secret — **must be ≥ 16 chars** |
 | `ADMIN_CODE` | Admin login code |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
-| `CLOUDINARY_API_KEY` | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
-| `RAZORPAY_KEY_ID` | Razorpay key ID (test keys start with `rzp_test_`) |
-| `RAZORPAY_KEY_SECRET` | Razorpay key secret |
-| `SENDGRID_API_KEY` | SendGrid API key (Option A for Emails) |
-| `SMTP_HOST` | SMTP Host (Option B for Emails - Fallback/Local testing) |
-| `SMTP_PORT` | SMTP Port |
-| `SMTP_USER` | SMTP Username/Email |
-| `SMTP_PASS` | SMTP App Password |
-| `SMTP_FROM` | Sender Name & Address (e.g., `"Left2Serve" <no-reply@left2serve.com>`) |
+| `CLOUDINARY_*` | Cloudinary API keys for image uploads |
+| `RAZORPAY_*` | Razorpay keys for online payments |
+| `SENDGRID_API_KEY` | SendGrid API key for transactional emails |
+| `SMTP_*` | Fallback SMTP configuration |
 
-## Features
+### Production Deployment
 
-### User Roles
-- **Donor** — List surplus food, manage listings, track reservations
-- **NGO / Shelter** — Browse and reserve available food
-- **Volunteer** — Browse, reserve, and coordinate pickups
-- **Admin** — Dashboard with user management, order tracking, NGO monitoring
+This repository is pre-configured for seamless zero-config deployment:
+- **Frontend → Vercel**: Import the `frontend` folder into Vercel. Provide `VITE_API_URL` to point to the backend. The included `vercel.json` manages SPA routing.
+- **Backend → Render**: Use the provided `backend/render.yaml` Blueprint. Render will automatically spin up a PostgreSQL instance and the Node.js API, running compilation checks before deployment.
 
-### Role Access & Privacy
+---
 
-Access is enforced on **both** the API (authoritative) and the UI (route guards + conditional rendering). The guiding principle: **personal contact info (phone/email) is only visible within a transactional relationship.**
-
-| Resource / field | Public | Donor | NGO / Volunteer | Admin |
-|---|:--:|:--:|:--:|:--:|
-| Browse listings (title, description, category, quantity, price, expiry, images) | ✅ | ✅ | ✅ | ✅ |
-| Donor name + organization (public attribution) | ✅ | ✅ | ✅ | ✅ |
-| Pickup address + instructions | ✅ | ✅ | ✅ | ✅ |
-| Donor phone number | ❌ | own only | ✅ after **approved** reservation | ✅ |
-| Donor email | ❌ | own only | ❌ | ✅ |
-| Own incoming reservation requests (requester name/org/phone) | — | ✅ | — | ✅ |
-| Own outgoing reservations (+ donor phone if approved) | — | — | ✅ | ✅ |
-| Other users' reservations | ❌ | ❌ | ❌ | ✅ |
-| Full user list, roles, suspend/delete | ❌ | ❌ | ❌ | ✅ |
-
-**Route guards** (`ProtectedRoute`): `/list-food` & `/edit-food` are donor-only; `/admin/dashboard` is admin-only; `/dashboard` & `/profile` require any authenticated user. Browse (`/browse`, `/food/:id`) is public.
-
-**Enforcement notes**
-- `GET /api/listings/:id` uses optional auth: donor contact (`phone`) is stripped unless the requester is the owner, an admin, or a receiver with an approved/collected reservation on that listing.
-- `GET /api/reservations` returns the donor's phone only when the reservation status is `approved` or `collected`.
-- Suspended users (`is_active = 0`) cannot log in; all write routes require a valid JWT.
-- The frontend additionally redirects non-owners away from the edit form, though the API ownership check remains authoritative.
-
-### Security
-
-- **Token revocation** — every JWT carries a `tv` (token_version) claim checked against the DB on each authenticated request. Bumping `token_version` (on password change or admin suspension) instantly invalidates all previously issued tokens, so revocation no longer waits for the 7-day expiry. The password-change endpoint returns a fresh token the client persists.
-- **Account lockout** — after 5 failed login attempts the account is locked for 15 minutes (HTTP 423 with a countdown). Successful login clears the counter. Wrong passwords return a generic `Invalid credentials` to avoid account enumeration; only a correct-but-suspended password reveals the suspended status.
-- **Password policy** — min 8 chars, ≥ 3 of (uppercase, lowercase, digits, symbols), with a common-password blocklist. Enforced server-side (`validatePassword`) with a matching live strength meter on Register and the password-change form.
-- **Bcrypt cost factor 12** for all password hashing (registration + password change).
-- **JWT secret guard** — the server refuses to boot unless `JWT_SECRET` is set and ≥ 16 chars.
-- **Security headers** — Helmet sets HSTS, `Cross-Origin-Opener-Policy: same-origin`, `Referrer-Policy`, and a restrictive CSP (`default-src 'self'`, `frame-ancestors 'none'`).
-- **Input validation** — listing `image_urls` are validated as `https://` Cloudinary-style URLs and capped at 5 before storage, preventing malicious `javascript:`/`data:` injection.
-- **Admin audit log** — all admin mutations (order status changes, role changes, suspensions, deletions) plus login successes/failures are recorded in `audit_log` with actor, action, target, detail, and IP. Viewable via `GET /api/admin/audit-log` and the Admin → Audit tab.
-- **Rate limiting** — global API limiter plus a stricter limiter on `/api/auth/login`, `/api/auth/register`, and `/api/admin/login`.
-
-### Core Features
-- **PWA (Progressive Web App)** — Installable on mobile/desktop, offline-capable service worker.
-- **i18n Localization** — Fully translated in English and Spanish with a dynamic toggle.
-- **Two-Factor Authentication (2FA)** — Time-based One-Time Password (TOTP) integration using standard authenticator apps.
-- **Live Chat (Socket.io)** — Real-time messaging between donors and receivers tied to active reservations.
-- **Advanced Admin Analytics** — Interactive `recharts` for activity trends and food distribution visualizations.
-- **Robust Email System** — Native SendGrid integration with seamless fallback to standard SMTP transport.
-- Food listing with image uploads (Cloudinary)
-- Real-time listing status (available → reserved → collected)
-- **Partial-quantity reservations** — a single large listing can serve multiple receivers; the listing stays available until its quantity is fully claimed, with a live "X available" count
-- Order tracking with visual step indicators
-- Role-based dashboards with statistics
-- In-app notifications with unread badge (reservation lifecycle events)
-- **Automated Cron Jobs** — Automatic expiry sweeps and system maintenance tasks running securely in the background.
-- **Full Text Search (FTS)** — Highly optimized, indexed PostgreSQL text search across listings.
-- **Reviews & ratings** — after a completed pickup, donors and receivers rate each other (1–5 stars + comment); average ratings appear on listings and profiles
-- **Impact tracking** — global impact report (`/impact`) and per-user impact (meals saved, CO₂e avoided, water saved, tree-years) on the profile
-- **Donor self-close** — record an offline/self-handled donation by marking an available listing as donated
-- Admin panel with full CRUD oversight, user management (role change, suspend, delete, password reset), listing moderation, and activity trends
-- SEO-optimized with React Helmet Async
-- Premium responsive design with rich animations
-
-## API Endpoints
-
-### Auth
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| POST | `/api/auth/register` | No |
-| POST | `/api/auth/login` | No |
-| GET | `/api/auth/me` | JWT |
-
-### Listings
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| GET | `/api/listings` | No |
-| GET | `/api/listings/mine` | JWT |
-| GET | `/api/listings/stats` | No |
-| GET | `/api/listings/:id` | No |
-| POST | `/api/listings` | JWT (donor) |
-| PUT | `/api/listings/:id` | JWT (owner) |
-| DELETE | `/api/listings/:id` | JWT (owner) |
-| POST | `/api/listings/:id/close` | JWT (owner) |
-| POST | `/api/listings/upload` | JWT |
-
-`GET /api/listings` supports server-side filtering, sorting, and pagination via query params: `category`, `search`, `sort` (`newest` \| `expiring` \| `quantity`), `page`, `limit`. It returns `{ listings, pagination: { page, limit, total, totalPages } }`. Available listings whose expiry has passed are automatically excluded and swept to `expired` status by a background job. Each listing includes a `remaining` field (quantity not yet claimed) so partial reservations are supported — a listing stays `available` until `remaining` reaches 0.
-
-### Reservations
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| POST | `/api/reservations` | JWT (ngo/volunteer) |
-| GET | `/api/reservations` | JWT |
-| GET | `/api/reservations/listing/:id` | JWT |
-| PATCH | `/api/reservations/:id` | JWT |
-
-Each reservation stores a `payment_method` (`none` for free listings, `cod`, or `razorpay`) and a `payment_status` (`pending` / `paid` / `failed`). For paid listings the reserver chooses between **Cash on Delivery** (paid at pickup) and **Razorpay** (paid online at reservation time).
-
-### Payments
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| POST | `/api/payments/config` | No |
-| POST | `/api/payments/create-order` | JWT (ngo/volunteer) |
-| POST | `/api/payments/verify` | JWT (ngo/volunteer) |
-
-`create-order` creates a Razorpay order and a `pending` reservation (holding the quantity), returning the `razorpay_order_id` + amount for the checkout. After the client completes the Razorpay checkout it calls `verify`, which checks the HMAC signature server-side and flips `payment_status` to `paid`.
-
-### Notifications
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| GET | `/api/notifications` | JWT |
-| GET | `/api/notifications/unread-count` | JWT |
-| PATCH | `/api/notifications/:id/read` | JWT |
-| PATCH | `/api/notifications/read-all` | JWT |
-| DELETE | `/api/notifications/:id` | JWT |
-
-### Reviews
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| POST | `/api/reviews` | JWT |
-| GET | `/api/reviews/reservation/:id` | JWT |
-| GET | `/api/reviews/user/:userId` | No |
-
-Reviews are 1–5 star ratings (with an optional comment) that donors and receivers leave for each other once a reservation is `collected`. One review per party per reservation; the reviewee is determined server-side from the reservation. `GET /api/reviews/user/:userId` returns `{ average, count, reviews }`.
-
-### Impact
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| GET | `/api/listings/impact` | No |
-| GET | `/api/auth/impact` | JWT |
-
-Notifications are generated automatically on reservation events (new request, approval, collection, cancellation) for both donors and receivers, including admin-driven order updates.
-
-### Admin
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| POST | `/api/admin/login` | Admin code |
-| GET | `/api/admin/stats` | JWT (admin) |
-| GET | `/api/admin/users` | JWT (admin) |
-| PATCH | `/api/admin/users/:id` | JWT (admin) |
-| PATCH | `/api/admin/users/:id/password` | JWT (admin) |
-| DELETE | `/api/admin/users/:id` | JWT (admin) |
-| GET | `/api/admin/ngos` | JWT (admin) |
-| GET | `/api/admin/orders` | JWT (admin) |
-| GET | `/api/admin/listings` | JWT (admin) |
-| DELETE | `/api/admin/listings/:id` | JWT (admin) |
-| GET | `/api/admin/trends` | JWT (admin) |
-| GET | `/api/admin/audit-log` | JWT (admin) |
-| PATCH | `/api/admin/orders/:id` | JWT (admin) |
-
-## Deployment 🚀 (Ready for Production)
-
-This repository is pre-configured for seamless zero-config deployment to **Vercel** (Frontend) and **Render** (Backend).
-
-### Frontend → Vercel (Zero-Config)
-
-The frontend is a Vite SPA. The included `vercel.json` and `package.json` are fully configured.
-1. Push the repository to GitHub.
-2. Go to [Vercel](https://vercel.com) and import the repository.
-3. Set the **Root Directory** to `frontend`.
-4. Vercel will automatically detect Vite. The `vercel.json` takes care of SPA routing (rewrites to `index.html`).
-5. **Environment Variable:** Add `VITE_API_URL` and set it to your Render backend URL (e.g., `https://left2serve-api.onrender.com`).
-6. Click **Deploy**.
-
-### Backend → Render (Blueprint Ready)
-
-The backend is a Node.js + Express API. It includes a `render.yaml` Blueprint which automates the setup.
-1. Push the repository to GitHub.
-2. Go to [Render Dashboard](https://dashboard.render.com/) and click **New > Blueprint**.
-3. Connect this repository. Render will read `backend/render.yaml` and automatically create:
-   - A Web Service (`left2serve-api`)
-   - A PostgreSQL Database (`left2serve-db`)
-4. **Environment Variables:** Render will prompt you or you can manually add the required secrets in the dashboard (see table below).
-   - *Note: `DATABASE_URL` is automatically injected by Render.*
-5. The `render.yaml` runs `npm install --include=dev && npm run build` to safely compile TypeScript before starting.
-
-### Required Environment Variables
-
-| Variable | Frontend | Backend | Notes |
-|----------|:--------:|:-------:|-------|
-| `VITE_API_URL` | ✅ | — | Render backend URL; leave empty in dev |
-| `PORT` | — | ✅ | Auto-set by Render |
-| `NODE_ENV` | — | ✅ | Set to `production` (Auto-set by Render) |
-| `CLIENT_URL` | — | ✅ | Vercel frontend URL for CORS (e.g. `https://left2serve.vercel.app`) |
-| `DATABASE_URL` | — | ✅ | PostgreSQL connection string (Auto-injected by Render) |
-| `DB_SSL` | — | optional | `1` if using external Postgres that requires SSL |
-| `JWT_SECRET` | — | ✅ | ≥ 16 chars, random string |
-| `ADMIN_CODE` | — | ✅ | Admin login code |
-| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | — | ✅ | Image uploads (server returns 503 if not set) |
-| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | — | ✅ | Online payments via Razorpay (COD still works if unset) |
-| `VITE_RAZORPAY_KEY_ID` | ✅ | — | Razorpay public key for the checkout |
-
-
-## License
-
+## 📄 License
 MIT
