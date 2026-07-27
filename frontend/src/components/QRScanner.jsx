@@ -31,7 +31,7 @@ export default function QRScanner({ onClose, onSuccess }) {
         }
       },
       () => {}
-    ).catch(err => {
+    ).catch(() => {
       setError('Camera access denied or unavailable.');
     });
 
@@ -40,6 +40,7 @@ export default function QRScanner({ onClose, onSuccess }) {
         scannerRef.current.stop().catch(console.error);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

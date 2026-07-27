@@ -1,4 +1,5 @@
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -27,15 +28,21 @@ export default function MapWrapper({ listings = [], center = [20.5937, 78.9629],
       {pickerMode ? (
         <LocationPicker position={position} setPosition={setPosition} />
       ) : (
-        listings.filter(l => l.latitude && l.longitude).map(l => (
-          <Marker key={l.id} position={[l.latitude, l.longitude]} eventHandlers={{ click: () => onMarkerClick && onMarkerClick(l) }}>
-            <Popup>
-              <div className="text-sm font-semibold mb-1">{l.title}</div>
-              <div className="text-xs text-gray-500 mb-2">{l.quantity} {l.unit} remaining</div>
-              <a href={`/food/${l.id}`} className="text-blue-600 hover:underline text-xs">View Details</a>
-            </Popup>
-          </Marker>
-        ))
+        <MarkerClusterGroup
+          chunkedLoading
+          maxClusterRadius={50}
+          spiderfyOnMaxZoom={true}
+        >
+          {listings.filter(l => l.latitude && l.longitude).map(l => (
+            <Marker key={l.id} position={[l.latitude, l.longitude]} eventHandlers={{ click: () => onMarkerClick && onMarkerClick(l) }}>
+              <Popup>
+                <div className="text-sm font-semibold mb-1">{l.title}</div>
+                <div className="text-xs text-gray-500 mb-2">{l.quantity} {l.unit} remaining</div>
+                <a href={`/food/${l.id}`} className="text-blue-600 hover:underline text-xs">View Details</a>
+              </Popup>
+            </Marker>
+          ))}
+        </MarkerClusterGroup>
       )}
     </MapContainer>
   );

@@ -43,6 +43,7 @@ export default function NotificationBell() {
 
   useEffect(() => {
     if (!user || user.role === 'admin') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUnread();
     
     const token = localStorage.getItem('token');

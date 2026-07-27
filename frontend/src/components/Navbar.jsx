@@ -5,6 +5,7 @@ import { useFavorites } from './Favorites';
 import { useConfirm } from './ConfirmDialog';
 import NotificationBell from './NotificationBell';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from './ThemeProvider';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -13,6 +14,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, i18n } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isActive = (path) => location.pathname === path ? 'text-accent bg-accent/5' : 'text-subtle hover:text-accent hover:bg-accent/3';
   const isSavedActive = () => location.pathname === '/saved' ? 'text-accent bg-accent/5' : 'text-subtle hover:text-accent hover:bg-accent/3';
@@ -54,6 +56,9 @@ export default function Navbar() {
             </Link>
 
             <div className="hidden md:flex items-center gap-1">
+              <button onClick={toggleTheme} className="btn-ghost text-xs p-2 mr-1" aria-label="Toggle theme">
+                {theme === 'dark' ? '☀️' : '🌙'}
+              </button>
               <button onClick={toggleLanguage} className="btn-ghost text-xs mr-2 font-bold uppercase" aria-label="Toggle language">
                 {i18n.language.startsWith('es') ? 'ES' : 'EN'}
               </button>

@@ -18,7 +18,7 @@ export default function DonorAnalytics() {
         } else {
           addToast('Failed to load analytics', 'error');
         }
-      } catch (err) {
+      } catch {
         addToast('Network error loading analytics', 'error');
       } finally {
         setLoading(false);

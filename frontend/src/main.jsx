@@ -5,7 +5,7 @@ import App from './App.jsx';
 import './i18n.js';
 import { registerSW } from 'virtual:pwa-register'
 
-const updateSW = registerSW({
+registerSW({
   onNeedRefresh() {
     // Optionally prompt user to refresh
   },

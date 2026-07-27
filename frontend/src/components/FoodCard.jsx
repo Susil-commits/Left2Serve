@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useFavorites } from './Favorites';
 
 const categoryIcons = { event: '🎉', restaurant: '🍽️', hotel: '🏨', caterer: '🍱', household: '🏠' };
@@ -20,7 +21,14 @@ export default function FoodCard({ listing }) {
   };
 
   return (
-    <Link to={`/food/${listing.id}`} className="block animate-scale-in group">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      whileHover={{ y: -4 }}
+      className="block"
+    >
+      <Link to={`/food/${listing.id}`} className="block group">
       <div className="premium-card overflow-hidden card-hover-lift">
         <div className="h-52 bg-gray-50 relative overflow-hidden">
           {imageUrl ? (
@@ -54,9 +62,16 @@ export default function FoodCard({ listing }) {
           )}
 
           <p className="text-subtle text-xs line-clamp-2 mb-3 leading-relaxed">{listing.description || 'No description provided'}</p>
-          <div className="flex justify-between items-center text-xs text-muted"><span className="font-medium text-subtle">{listing.quantity} {listing.unit}</span><span className="truncate ml-2">{listing.donor_name || listing.donor_org}</span></div>
+          <div className="flex justify-between items-center text-xs text-muted mb-2"><span className="font-medium text-subtle">{listing.quantity} {listing.unit}</span><span className="truncate ml-2">{listing.donor_name || listing.donor_org}</span></div>
+          {listing.distance_km != null && (
+            <div className="flex items-center text-xs text-accent font-medium mt-1">
+              <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              {Number(listing.distance_km).toFixed(1)} km away
+            </div>
+          )}
         </div>
       </div>
-    </Link>
+      </Link>
+    </motion.div>
   );
 }
