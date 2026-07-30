@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { get, all, run } from '../db/database.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
@@ -23,7 +24,7 @@ router.post('/login', async (req: Request, res: Response) => {
   if (!ADMIN_CODE) return res.status(503).json({ error: 'Admin access is not configured' });
   if (!adminCode) return res.status(400).json({ error: 'Admin code is required' });
   if (adminCode !== ADMIN_CODE) return res.status(401).json({ error: 'Invalid admin code' });
-  const token = jwt.sign({ id: 0, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '8h' });
+  const token = jwt.sign({ id: 0, role: 'admin', tv: 0 }, process.env.JWT_SECRET, { expiresIn: '8h' });
   res.json({ token, user: { id: 0, name: 'Administrator', email: 'admin@left2serve.com', role: 'admin' } });
 });
 
@@ -187,9 +188,8 @@ router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), val
     if (provided && provided.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters' });
     const gen = () => {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-      let s = '';
-      for (let i = 0; i < 14; i++) s += chars[Math.floor(Math.random() * chars.length)];
-      return s;
+      const bytes = crypto.randomBytes(14);
+      return Array.from(bytes).map((b) => chars[b % chars.length]).join('');
     };
     const password = provided || gen();
     const password_hash = await bcrypt.hash(password, 12);
@@ -274,15 +274,18 @@ router.get('/export', authMiddleware, roleMiddleware('admin'), async (req: Reque
       const values = headers.map(header => {
         const val = row[header];
         if (val === null || val === undefined) return '';
-        const str = String(val).replace(/"/g, '""');
-        if (str.includes(',') || str.includes('\\n') || str.includes('"')) return `"${str}"`;
+        const str = String(val);
+        // Quote the field if it contains a comma, newline, or double-quote
+        if (str.includes(',') || str.includes('\n') || str.includes('\r') || str.includes('"')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
         return str;
       });
       csvRows.push(values.join(','));
     }
 
-    const csvData = csvRows.join('\\n');
-    res.setHeader('Content-Type', 'text/csv');
+    const csvData = csvRows.join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=export_${type}_${new Date().getTime()}.csv`);
     res.send(csvData);
 

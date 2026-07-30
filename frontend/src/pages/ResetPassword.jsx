@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { API_BASE_URL } from '../api';
+import { api } from '../api';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -34,13 +34,7 @@ export default function ResetPassword() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, newPassword })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to reset password');
+      await api.auth.resetPassword({ token, newPassword });
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
     } catch (err) {

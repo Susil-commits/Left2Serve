@@ -9,20 +9,48 @@ let pool: Pool | null = null;
 
 // Convert MySQL-style "?" placeholders into PostgreSQL "$N" placeholders so the
 // route files can keep using the familiar "?" syntax without per-query renumbering.
-// WARNING: This is a simple parser. It ignores `?` inside single quotes, but will fail
-// if you use double quotes containing `?` or PostgreSQL JSON operators like `?|` or `?&`.
+// The parser correctly handles '' (escaped single quotes) inside SQL strings.
+// NOTE: PostgreSQL JSON operators ?| and ?& are NOT supported — use $N params directly for those.
+
 function formatQuery(sql: string, params: any[]): string {
   if (!Array.isArray(params) || params.length === 0) return sql;
+  // Safety: PostgreSQL JSON operators ?| and ?& use literal `?` and will be
+  // mis-parsed as parameter placeholders. Callers that need those operators
+  // must use $1-style params and NOT pass them through this function.
+  if (/\?\||\?&/.test(sql)) {
+    throw new Error('formatQuery: SQL contains ?| or ?& JSON operators which conflict with ? placeholders. Use $N params directly.');
+  }
   let i = 0;
   let inString = false;
   let result = '';
-  for (let char of sql) {
-    if (char === "'") inString = !inString;
+  let j = 0;
+  while (j < sql.length) {
+    const char = sql[j];
+    if (char === "'" && !inString) {
+      // Check for escaped quote '' (two consecutive quotes outside a string = start of empty string literal)
+      inString = true;
+      result += char;
+      j++;
+      continue;
+    }
+    if (char === "'" && inString) {
+      // Check if next char is also ' (escaped quote inside string)
+      if (sql[j + 1] === "'") {
+        result += "''"; // emit both, stay in string
+        j += 2;
+        continue;
+      }
+      inString = false;
+      result += char;
+      j++;
+      continue;
+    }
     if (char === '?' && !inString) {
       result += `$${++i}`;
     } else {
       result += char;
     }
+    j++;
   }
   return result;
 }

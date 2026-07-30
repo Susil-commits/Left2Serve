@@ -5,7 +5,7 @@ export async function createNotification(userId: number, type: string, title: st
   try {
     const id = await insert(
       'INSERT INTO notifications (user_id, type, title, message, data) VALUES (?, ?, ?, ?, ?)',
-      [userId, type, title, message, data]
+      [userId, type, title, message, JSON.stringify(data)]
     );
     import('../server.js').then(({ io }) => {
       io.to(`user_${userId}`).emit('new_notification', {

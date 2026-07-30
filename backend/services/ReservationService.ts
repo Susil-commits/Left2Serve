@@ -10,7 +10,9 @@ export class ReservationService {
     const { food_listing_id, quantity, pickup_time, notes, payment_method } = payload;
     const qty = Number(quantity);
 
-    const listing = await get('SELECT * FROM food_listings WHERE id = ?', [food_listing_id]);
+    // Lock the listing row first to prevent concurrent reservations from overbooking.
+    // SELECT FOR UPDATE serializes all reservation attempts for the same listing.
+    const listing = await get('SELECT * FROM food_listings WHERE id = ? FOR UPDATE', [food_listing_id]);
     if (!listing) throw new AppError(404, 'Listing not found');
     if (listing.status !== 'available') throw new AppError(400, 'Listing is no longer available');
     if (new Date(listing.expiry_date) <= new Date()) throw new AppError(400, 'This listing has expired');
@@ -105,8 +107,11 @@ export class ReservationService {
 
     if (!isOwner && !isReserver) throw new AppError(403, 'Not authorized');
 
-    const allowed = new Set(['collected', 'cancelled']);
-    if (isOwner) allowed.add('approved');
+    // Only listing owners (donors) can approve or mark collected.
+    // Reservers can only cancel their own reservation.
+    const allowed = new Set<string>();
+    if (isOwner) { allowed.add('approved'); allowed.add('collected'); }
+    if (isReserver) { allowed.add('cancelled'); }
     if (!allowed.has(status)) throw new AppError(400, `Cannot set status to ${status}`);
 
     await run('UPDATE reservations SET status = ? WHERE id = ?', [status, reservationId]);

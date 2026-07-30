@@ -248,6 +248,9 @@ router.put('/:id', authMiddleware, validateIdParam('id'), validate(updateListing
     const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
     if (listing.user_id !== req.user!.id) return res.status(403).json({ error: 'Not authorized' });
+    if (['expired', 'collected', 'cancelled'].includes(listing.status)) {
+      return res.status(409).json({ error: 'Cannot edit a listing that is already closed' });
+    }
     const { title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, dietary_preferences, status, latitude, longitude } = req.body;
     const nextCategory = category || listing.category;
     const nextQty = quantity != null ? Number(quantity) : listing.quantity;

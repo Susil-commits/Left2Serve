@@ -131,7 +131,12 @@ router.post('/verify', authMiddleware, roleMiddleware('ngo', 'volunteer'), valid
       await run("UPDATE reservations SET payment_status = 'failed' WHERE id = ?", [reservation_id]);
       return res.status(400).json({ error: 'Payment signature verification failed' });
     }
-    await run('UPDATE reservations SET payment_status = ?, razorpay_payment_id = ?, razorpay_signature = ? WHERE id = ?', ['paid', razorpay_payment_id, razorpay_signature, reservation_id]);
+    // Upgrade payment status AND reservation status so the donor can see and act on it
+    await run(
+      "UPDATE reservations SET payment_status = ?, status = 'pending', razorpay_payment_id = ?, razorpay_signature = ? WHERE id = ?",
+      ['paid', razorpay_payment_id, razorpay_signature, reservation_id]
+    );
+    await recomputeListingStatus(reservation.food_listing_id);
     const updated = await get('SELECT * FROM reservations WHERE id = ?', [reservation_id]);
     res.json({ success: true, reservation: updated });
   } catch (err) {

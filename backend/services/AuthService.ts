@@ -81,8 +81,8 @@ export class AuthService {
       }
     }
 
-    if (user.locked_until) await run('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?', [user.id]);
-    else await run('UPDATE users SET failed_attempts = 0 WHERE id = ?', [user.id]);
+    // Always clear failed attempts and any lingering lock on successful login
+    await run('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?', [user.id]);
 
     const token = this.signToken(user);
     const { password_hash, token_version, failed_attempts, locked_until, is_active, two_factor_secret, ...safeUser } = user;

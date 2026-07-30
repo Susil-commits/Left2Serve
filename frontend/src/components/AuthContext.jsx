@@ -13,7 +13,15 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    api.auth.me().then(setUser).catch(() => localStorage.removeItem('token')).finally(() => setLoading(false));
+    // Guard against the server being unreachable: if /me doesn't settle within 8s,
+    // clear the loading spinner and remove the stale token so the app stays usable.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    api.auth.me()
+      .then(setUser)
+      .catch(() => localStorage.removeItem('token'))
+      .finally(() => { clearTimeout(timeout); setLoading(false); });
+    return () => { controller.abort(); clearTimeout(timeout); };
   }, []);
 
   useEffect(() => {

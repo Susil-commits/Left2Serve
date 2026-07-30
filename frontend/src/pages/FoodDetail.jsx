@@ -84,8 +84,9 @@ export default function FoodDetail() {
     } catch (err) {
       setError(err.message);
       addToast(err.message, 'error');
+    } finally {
+      setReserving(false);
     }
-    setReserving(false);
   };
 
   const handleClose = async () => {

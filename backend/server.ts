@@ -93,6 +93,8 @@ app.use('/api/', apiLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/admin/login', authLimiter);
+const aiLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many AI requests, please slow down' } });
+app.use('/api/ai', aiLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/listings', listingRoutes);
@@ -155,6 +157,8 @@ io.on('connection', (socket) => {
   socket.on('send_message', async (data) => {
     const { reservationId, content } = data;
     if (!content || !reservationId) return;
+    // Clamp message length to prevent oversized payloads
+    const safeContent = String(content).slice(0, 2000);
     const rId = Number(reservationId);
     if (!Number.isInteger(rId) || rId <= 0) {
       socket.emit('error', 'Invalid reservation ID');
@@ -166,7 +170,7 @@ io.on('connection', (socket) => {
     }
 
     try {
-      const id = await insert('INSERT INTO messages (reservation_id, sender_id, content) VALUES (?, ?, ?)', [rId, socket.data.user.id, content]);
+      const id = await insert('INSERT INTO messages (reservation_id, sender_id, content) VALUES (?, ?, ?)', [rId, socket.data.user.id, safeContent]);
       const user = await get('SELECT name FROM users WHERE id = ?', [socket.data.user.id]);
       
       io.to(`reservation_${rId}`).emit('new_message', {
@@ -174,7 +178,7 @@ io.on('connection', (socket) => {
         reservation_id: rId,
         sender_id: socket.data.user.id,
         sender_name: user?.name,
-        content,
+        content: safeContent,
         created_at: new Date().toISOString(),
       });
     } catch (err) {
