@@ -4,7 +4,21 @@ import { get, all, run, insert } from '../db/database.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 import { createNotification } from '../db/notify.js';
 import { getAvailability, recomputeListingStatus } from '../db/availability.js';
+import { z } from 'zod';
+import { validate } from '../middleware/validate.js';
 const router = Router();
+const createOrderSchema = z.object({
+    food_listing_id: z.number().int().positive(),
+    quantity: z.number().int().positive().min(1),
+    pickup_time: z.string().datetime({ offset: true }).optional().nullable(),
+    notes: z.string().max(1000).optional().nullable()
+});
+const verifySchema = z.object({
+    reservation_id: z.number().int().positive(),
+    razorpay_order_id: z.string().min(1),
+    razorpay_payment_id: z.string().min(1),
+    razorpay_signature: z.string().min(1)
+});
 const KEY_ID = process.env.RAZORPAY_KEY_ID;
 const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 const RAZORPAY_CONFIGURED = !!(KEY_ID && KEY_SECRET);
@@ -37,15 +51,11 @@ function verifySignature(orderId, paymentId, signature) {
 router.post('/config', (req, res) => {
     res.json({ configured: RAZORPAY_CONFIGURED, key_id: RAZORPAY_CONFIGURED ? KEY_ID : null });
 });
-router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'), async (req, res) => {
+router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'), validate(createOrderSchema), async (req, res) => {
     if (!RAZORPAY_CONFIGURED)
         return res.status(503).json({ error: 'Razorpay is not configured on the server' });
     const { food_listing_id, quantity, pickup_time, notes } = req.body;
-    if (!food_listing_id || !quantity)
-        return res.status(400).json({ error: 'food_listing_id and quantity are required' });
     const qty = Number(quantity);
-    if (!Number.isFinite(qty) || qty < 1)
-        return res.status(400).json({ error: 'Quantity must be at least 1' });
     if (pickup_time && (new Date(pickup_time).toString() === 'Invalid Date' || new Date(pickup_time) < new Date()))
         return res.status(400).json({ error: 'Pickup time must be in the future' });
     try {
@@ -96,12 +106,10 @@ router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'),
         res.status(500).json({ error: 'Failed to create payment order' });
     }
 });
-router.post('/verify', authMiddleware, roleMiddleware('ngo', 'volunteer'), async (req, res) => {
+router.post('/verify', authMiddleware, roleMiddleware('ngo', 'volunteer'), validate(verifySchema), async (req, res) => {
     if (!RAZORPAY_CONFIGURED)
         return res.status(503).json({ error: 'Razorpay is not configured on the server' });
     const { reservation_id, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-    if (!reservation_id || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature)
-        return res.status(400).json({ error: 'Missing payment verification details' });
     try {
         const reservation = await get('SELECT * FROM reservations WHERE id = ?', [reservation_id]);
         if (!reservation)
@@ -119,7 +127,9 @@ router.post('/verify', authMiddleware, roleMiddleware('ngo', 'volunteer'), async
             await run("UPDATE reservations SET payment_status = 'failed' WHERE id = ?", [reservation_id]);
             return res.status(400).json({ error: 'Payment signature verification failed' });
         }
-        await run('UPDATE reservations SET payment_status = ?, razorpay_payment_id = ?, razorpay_signature = ? WHERE id = ?', ['paid', razorpay_payment_id, razorpay_signature, reservation_id]);
+        // Upgrade payment status AND reservation status so the donor can see and act on it
+        await run("UPDATE reservations SET payment_status = ?, status = 'pending', razorpay_payment_id = ?, razorpay_signature = ? WHERE id = ?", ['paid', razorpay_payment_id, razorpay_signature, reservation_id]);
+        await recomputeListingStatus(reservation.food_listing_id);
         const updated = await get('SELECT * FROM reservations WHERE id = ?', [reservation_id]);
         res.json({ success: true, reservation: updated });
     }

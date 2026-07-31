@@ -24,22 +24,52 @@ function sanitizeImageUrls(urls) {
         return [];
     return urls
         .map((u) => String(u || ''))
-        .filter((u) => /^https:\/\/[^\s'"]+\.(jpg|jpeg|png|webp)(\?[^\s'"]*)?$/i.test(u) || /^https:\/\/res\.cloudinary\.com\/[^\s'"]+$/i.test(u))
+        .filter((u) => /^https:\/\/[^\s'"]+\.(jpg|jpeg|png|webp)(\?[^\s'"]*)?$/i.test(u) || /^https:\/\/res\.cloudinary\.com\/[^\s'"]+$/i.test(u) || /^\/uploads\/left2serve\/[^\s'"]+\.webp$/i.test(u) || /^https:\/\/[^\s'"]+\/uploads\/left2serve\/[^\s'"]+\.webp$/i.test(u))
         .slice(0, MAX_IMAGES);
 }
+import fs from 'fs';
+import path from 'path';
+import sharp from 'sharp';
+import { Readable } from 'stream';
 function uploadToCloudinary(buffer) {
     return new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream({ folder: 'left2serve', transformation: [{ width: 1200, height: 1200, crop: 'limit', quality: 'auto' }] }, (err, result) => err ? reject(err) : resolve(result.secure_url));
-        stream.end(buffer);
+        const stream = cloudinary.uploader.upload_stream({ folder: 'left2serve', resource_type: 'auto' }, (err, result) => err ? reject(err) : resolve(result.secure_url));
+        const readable = new Readable();
+        readable.push(buffer);
+        readable.push(null);
+        readable.pipe(stream);
     });
 }
 router.post('/upload', authMiddleware, upload.array('images', 5), async (req, res) => {
-    if (!CLOUDINARY_CONFIGURED)
-        return res.status(503).json({ error: 'Image uploads are not configured on the server' });
-    if (!req.files || !req.files.length)
-        return res.status(400).json({ error: 'No images provided' });
     try {
-        const urls = await Promise.all(req.files.map(f => uploadToCloudinary(f.buffer)));
+        const urls = [];
+        const files = req.files;
+        for (const f of files) {
+            // Process image: resize width 1200 max, auto orientation, convert to highly compressed webp
+            const processedBuffer = await sharp(f.buffer)
+                .rotate()
+                .resize({ width: 1200, withoutEnlargement: true })
+                .webp({ quality: 80 })
+                .toBuffer();
+            if (CLOUDINARY_CONFIGURED) {
+                try {
+                    const url = await uploadToCloudinary(processedBuffer);
+                    urls.push(url);
+                    continue;
+                }
+                catch (err) {
+                    console.error('Cloudinary upload failed, falling back to local storage:', err.message);
+                }
+            }
+            // Local fallback
+            const dir = path.join(process.cwd(), 'uploads', 'left2serve');
+            if (!fs.existsSync(dir))
+                fs.mkdirSync(dir, { recursive: true });
+            const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
+            fs.writeFileSync(path.join(dir, filename), processedBuffer);
+            const base = req.protocol ? `${req.protocol}://${req.get('host')}` : '';
+            urls.push(base ? `${base}/uploads/left2serve/${filename}` : `/uploads/left2serve/${filename}`);
+        }
         res.json({ urls });
     }
     catch (err) {
@@ -97,14 +127,23 @@ router.get('/analytics/me', authMiddleware, roleMiddleware('donor'), async (req,
 });
 router.get('/mine', authMiddleware, async (req, res) => {
     try {
-        const listings = await all(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.user_id = ? ORDER BY fl.created_at DESC`, [req.user.id]);
+        const listings = await all(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.user_id = ? AND fl.is_template = false ORDER BY fl.created_at DESC`, [req.user.id]);
         res.json(listings.map(withRemaining));
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to fetch your listings' });
     }
 });
-router.get('/stats', async (req, res) => {
+router.get('/templates', authMiddleware, async (req, res) => {
+    try {
+        const templates = await all(`SELECT * FROM food_listings WHERE user_id = ? AND is_template = true ORDER BY created_at DESC`, [req.user.id]);
+        res.json(templates);
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Failed to fetch templates' });
+    }
+});
+router.get('/stats', cacheMiddleware(300), async (req, res) => {
     try {
         const [listingsRow] = await all("SELECT COUNT(*) as count FROM food_listings WHERE status = 'available'");
         const [donorsRow] = await all("SELECT COUNT(*) as count FROM users WHERE role = 'donor'");
@@ -121,7 +160,7 @@ router.get('/stats', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 });
-router.get('/impact', async (req, res) => {
+router.get('/impact', cacheMiddleware(300), async (req, res) => {
     try {
         const [mealsRow] = await all("SELECT COALESCE(SUM(quantity), 0) as total FROM reservations WHERE status = 'collected'");
         const [listingsRow] = await all('SELECT COUNT(*) as count FROM food_listings');
@@ -178,7 +217,8 @@ const listingSchema = z.object({
     image_urls: z.array(z.string()).optional().default([]),
     dietary_preferences: z.array(z.string()).optional().default([]),
     latitude: z.preprocess((val) => val != null ? Number(val) : null, z.number().nullable().optional()),
-    longitude: z.preprocess((val) => val != null ? Number(val) : null, z.number().nullable().optional())
+    longitude: z.preprocess((val) => val != null ? Number(val) : null, z.number().nullable().optional()),
+    is_template: z.boolean().optional().default(false)
 });
 router.post('/', authMiddleware, roleMiddleware('donor'), validate(listingSchema), async (req, res, next) => {
     try {
@@ -201,6 +241,9 @@ router.put('/:id', authMiddleware, validateIdParam('id'), validate(updateListing
             return res.status(404).json({ error: 'Listing not found' });
         if (listing.user_id !== req.user.id)
             return res.status(403).json({ error: 'Not authorized' });
+        if (['expired', 'collected', 'cancelled'].includes(listing.status)) {
+            return res.status(409).json({ error: 'Cannot edit a listing that is already closed' });
+        }
         const { title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, dietary_preferences, status, latitude, longitude } = req.body;
         const nextCategory = category || listing.category;
         const nextQty = quantity != null ? Number(quantity) : listing.quantity;

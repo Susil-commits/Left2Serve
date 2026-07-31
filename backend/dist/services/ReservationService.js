@@ -3,11 +3,14 @@ import { getAvailability, recomputeListingStatus } from '../db/availability.js';
 import { createNotification } from '../db/notify.js';
 import { sendReservationApprovedEmail, sendOrderUpdateEmail, sendOrderCancelledEmail } from '../utils/email.js';
 import { AppError } from '../utils/AppError.js';
+import { BadgeService } from './BadgeService.js';
 export class ReservationService {
     static async createReservation(userId, payload) {
         const { food_listing_id, quantity, pickup_time, notes, payment_method } = payload;
         const qty = Number(quantity);
-        const listing = await get('SELECT * FROM food_listings WHERE id = ?', [food_listing_id]);
+        // Lock the listing row first to prevent concurrent reservations from overbooking.
+        // SELECT FOR UPDATE serializes all reservation attempts for the same listing.
+        const listing = await get('SELECT * FROM food_listings WHERE id = ? FOR UPDATE', [food_listing_id]);
         if (!listing)
             throw new AppError(404, 'Listing not found');
         if (listing.status !== 'available')
@@ -69,6 +72,7 @@ export class ReservationService {
             throw new AppError(400, 'Reservation is not approved');
         await run("UPDATE reservations SET status = 'collected' WHERE id = ?", [reservation.id]);
         await recomputeListingStatus(reservation.food_listing_id);
+        await BadgeService.addMealsAndCheckBadges(listing.user_id, reservation.quantity);
         const updated = await get('SELECT * FROM reservations WHERE id = ?', [reservation.id]);
         const ctx = { reservationId: reservation.id, listingId: reservation.food_listing_id };
         await createNotification(reservation.user_id, 'reservation_collected', 'Pickup completed', `Donor scanned your QR code and marked "${listing.title}" as collected.`, ctx);
@@ -86,15 +90,25 @@ export class ReservationService {
         const isReserver = reservation.user_id === userId;
         if (!isOwner && !isReserver)
             throw new AppError(403, 'Not authorized');
-        const allowed = new Set(['collected', 'cancelled']);
-        if (isOwner)
+        // Only listing owners (donors) can approve or mark collected.
+        // Reservers can only cancel their own reservation.
+        const allowed = new Set();
+        if (isOwner) {
             allowed.add('approved');
+            allowed.add('collected');
+        }
+        if (isReserver) {
+            allowed.add('cancelled');
+        }
         if (!allowed.has(status))
             throw new AppError(400, `Cannot set status to ${status}`);
         await run('UPDATE reservations SET status = ? WHERE id = ?', [status, reservationId]);
         await recomputeListingStatus(reservation.food_listing_id);
-        const updated = await get('SELECT * FROM reservations WHERE id = ?', [reservationId]);
         const info = await get('SELECT title, user_id, pickup_address FROM food_listings WHERE id = ?', [reservation.food_listing_id]);
+        if (status === 'collected') {
+            await BadgeService.addMealsAndCheckBadges(info?.user_id, reservation.quantity);
+        }
+        const updated = await get('SELECT * FROM reservations WHERE id = ?', [reservationId]);
         const ctx = { reservationId: reservation.id, listingId: reservation.food_listing_id };
         const reserver = await get('SELECT name, email FROM users WHERE id = ?', [reservation.user_id]);
         const donor = await get('SELECT name, email FROM users WHERE id = ?', [info?.user_id]);

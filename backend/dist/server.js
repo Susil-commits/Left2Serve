@@ -3,12 +3,11 @@ import 'express-async-errors';
 import express from 'express';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import jwt from 'jsonwebtoken';
-import { get, insert } from './db/database.js';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import initializeDb from './db/init.js';
@@ -24,9 +23,11 @@ import reviewRoutes from './routes/reviews.js';
 import chatRoutes from './routes/chat.js';
 import watchlistsRoutes from './routes/watchlists.js';
 import forumRoutes from './routes/forum.js';
+import aiRoutes from './routes/ai.js';
 import { v4 as uuidv4 } from 'uuid';
 import { xssClean } from './middleware/xss.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { setupSocketHandlers } from './sockets/socketHandler.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
@@ -68,6 +69,7 @@ app.use(helmet({
 }));
 app.use(cors({ origin: corsOrigin, credentials: true, maxAge: 86400 }));
 app.use(express.json({ limit: '1mb' }));
+app.use(compression());
 // Inject Request ID
 app.use((req, res, next) => {
     req.reqId = uuidv4();
@@ -83,6 +85,8 @@ app.use('/api/', apiLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/admin/login', authLimiter);
+const aiLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many AI requests, please slow down' } });
+app.use('/api/ai', aiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/reservations', reservationRoutes);
@@ -93,6 +97,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/watchlists', watchlistsRoutes);
 app.use('/api/forum', forumRoutes);
+app.use('/api/ai', aiRoutes);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use((req, res) => { res.status(404).json({ error: 'Not found' }); });
 app.use(errorHandler);
@@ -102,71 +107,7 @@ export const io = new SocketIOServer(server, {
         credentials: true
     }
 });
-io.use((socket, next) => {
-    const token = socket.handshake.auth.token;
-    if (!token)
-        return next(new Error('Authentication error'));
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        socket.data.user = decoded;
-        next();
-    }
-    catch (err) {
-        next(new Error('Authentication error'));
-    }
-});
-io.on('connection', (socket) => {
-    if (socket.data?.user?.id) {
-        socket.join(`user_${socket.data.user.id}`);
-    }
-    socket.on('join_reservation', async (reservationId) => {
-        const rId = Number(reservationId);
-        if (!Number.isInteger(rId) || rId <= 0) {
-            socket.emit('error', 'Invalid reservation ID');
-            return;
-        }
-        const reservation = await get('SELECT * FROM reservations WHERE id = ?', [rId]);
-        if (!reservation)
-            return;
-        const listing = await get('SELECT user_id FROM food_listings WHERE id = ?', [reservation.food_listing_id]);
-        const isReserver = socket.data.user.id === reservation.user_id;
-        const isDonor = listing && socket.data.user.id === listing.user_id;
-        const isAdmin = socket.data.user.role === 'admin';
-        if (isReserver || isDonor || isAdmin) {
-            socket.join(`reservation_${rId}`);
-        }
-    });
-    socket.on('send_message', async (data) => {
-        const { reservationId, content } = data;
-        if (!content || !reservationId)
-            return;
-        const rId = Number(reservationId);
-        if (!Number.isInteger(rId) || rId <= 0) {
-            socket.emit('error', 'Invalid reservation ID');
-            return;
-        }
-        if (!socket.rooms.has(`reservation_${rId}`)) {
-            socket.emit('error', 'You must join the reservation chat first');
-            return;
-        }
-        try {
-            const id = await insert('INSERT INTO messages (reservation_id, sender_id, content) VALUES (?, ?, ?)', [rId, socket.data.user.id, content]);
-            const user = await get('SELECT name FROM users WHERE id = ?', [socket.data.user.id]);
-            io.to(`reservation_${rId}`).emit('new_message', {
-                id,
-                reservation_id: rId,
-                sender_id: socket.data.user.id,
-                sender_name: user?.name,
-                content,
-                created_at: new Date().toISOString(),
-            });
-        }
-        catch (err) {
-            console.error('Failed to send message:', err);
-            socket.emit('error', 'Failed to send message');
-        }
-    });
-});
+setupSocketHandlers(io);
 const PORT = process.env.PORT || 5000;
 initializeDb().then(async () => {
     await sweepExpiredListings();

@@ -12,10 +12,15 @@ export class ListingService {
     }
     static async getAllListings(queryOptions) {
         const { category, status, search, sort, dietary, page = 1, limit = 12, lat, lng, distance } = queryOptions;
-        let query = `SELECT fl.*, u.name as donor_name, u.organization as donor_org, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE 1=1`;
-        let countQuery = `SELECT COUNT(*) as total FROM food_listings fl WHERE 1=1`;
+        let selectCols = `fl.*, u.name as donor_name, u.organization as donor_org, GREATEST(${REMAINING_SQL}, 0) AS remaining`;
         const params = [];
         const countParams = [];
+        if (lat && lng && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
+            const mysqlDistanceSql = `( 6371 * acos(LEAST(1.0, GREATEST(-1.0, cos(radians(${Number(lat)})) * cos(radians(fl.latitude)) * cos(radians(fl.longitude) - radians(${Number(lng)})) + sin(radians(${Number(lat)})) * sin(radians(fl.latitude))))) )`;
+            selectCols += `, ${mysqlDistanceSql} AS distance_km`;
+        }
+        let query = `SELECT ${selectCols} FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE fl.is_template = false`;
+        let countQuery = `SELECT COUNT(*) as total FROM food_listings fl WHERE fl.is_template = false`;
         if (lat && lng && distance) {
             const radius = Number(distance);
             if (!isNaN(Number(lat)) && !isNaN(Number(lng)) && !isNaN(radius)) {
@@ -73,15 +78,15 @@ export class ListingService {
         };
     }
     static async createListing(userId, data) {
-        const { title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, dietary_preferences, latitude, longitude } = data;
+        const { title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, dietary_preferences, latitude, longitude, has_safety_checklist, is_template } = data;
         const qty = Number(quantity);
         const dietaryTags = Array.isArray(dietary_preferences) ? dietary_preferences : [];
         const lat = latitude ? Number(latitude) : null;
         const lng = longitude ? Number(longitude) : null;
-        const id = await insert(`INSERT INTO food_listings (user_id, title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, dietary_preferences, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [userId, String(title).trim(), description || null, category, qty, unit || 'servings', price || 0, expiry_date, String(pickup_address).trim(), pickup_instructions || null, JSON.stringify(image_urls), JSON.stringify(dietaryTags), lat, lng]);
+        const id = await insert(`INSERT INTO food_listings (user_id, title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, dietary_preferences, latitude, longitude, has_safety_checklist, is_template) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [userId, String(title).trim(), description || null, category, qty, unit || 'servings', price || 0, expiry_date, String(pickup_address).trim(), pickup_instructions || null, JSON.stringify(image_urls), JSON.stringify(dietaryTags), lat, lng, !!has_safety_checklist, !!is_template]);
         const listing = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [id]);
-        // Trigger Smart Alerts
-        if (lat !== null && lng !== null) {
+        // Trigger Smart Alerts if it's not a template
+        if (lat !== null && lng !== null && !is_template) {
             const searchStr = `${title} ${description || ''} ${category}`;
             const watchers = await all(`
         SELECT user_id, keyword FROM watchlists 

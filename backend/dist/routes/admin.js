@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { get, all, run } from '../db/database.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
@@ -7,6 +8,7 @@ import { validateIdParam } from '../middleware/validateParam.js';
 import { createNotification } from '../db/notify.js';
 import { audit } from '../db/audit.js';
 import { recomputeListingStatus } from '../db/availability.js';
+import { cacheMiddleware } from '../utils/cache.js';
 const router = Router();
 const ADMIN_CODE = process.env.ADMIN_CODE;
 const USER_ROLES = ['donor', 'ngo', 'volunteer'];
@@ -21,10 +23,10 @@ router.post('/login', async (req, res) => {
         return res.status(400).json({ error: 'Admin code is required' });
     if (adminCode !== ADMIN_CODE)
         return res.status(401).json({ error: 'Invalid admin code' });
-    const token = jwt.sign({ id: 0, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ id: 0, role: 'admin', tv: 0 }, process.env.JWT_SECRET, { expiresIn: '8h' });
     res.json({ token, user: { id: 0, name: 'Administrator', email: 'admin@left2serve.com', role: 'admin' } });
 });
-router.get('/stats', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/stats', authMiddleware, roleMiddleware('admin'), cacheMiddleware(60), async (req, res) => {
     try {
         const [usersRow] = await all('SELECT COUNT(*) as count FROM users');
         const [ngosRow] = await all("SELECT COUNT(*) as count FROM users WHERE role = 'ngo'");
@@ -200,10 +202,8 @@ router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), val
             return res.status(400).json({ error: 'New password must be at least 8 characters' });
         const gen = () => {
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-            let s = '';
-            for (let i = 0; i < 14; i++)
-                s += chars[Math.floor(Math.random() * chars.length)];
-            return s;
+            const bytes = crypto.randomBytes(14);
+            return Array.from(bytes).map((b) => chars[b % chars.length]).join('');
         };
         const password = provided || gen();
         const password_hash = await bcrypt.hash(password, 12);
@@ -248,6 +248,52 @@ router.get('/audit-log', authMiddleware, roleMiddleware('admin'), async (req, re
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to fetch audit log' });
+    }
+});
+router.get('/export', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+    try {
+        const type = req.query.type;
+        if (!['users', 'listings', 'reservations'].includes(type)) {
+            return res.status(400).json({ error: 'Invalid export type. Must be users, listings, or reservations.' });
+        }
+        let data = [];
+        if (type === 'users') {
+            data = await all('SELECT id, name, email, role, phone, organization, is_active, created_at FROM users ORDER BY created_at DESC');
+        }
+        else if (type === 'listings') {
+            data = await all('SELECT id, user_id, title, category, quantity, status, created_at FROM food_listings ORDER BY created_at DESC');
+        }
+        else if (type === 'reservations') {
+            data = await all('SELECT id, food_listing_id, user_id, quantity, status, payment_method, amount, created_at FROM reservations ORDER BY created_at DESC');
+        }
+        if (data.length === 0) {
+            return res.status(404).send('No data found');
+        }
+        const headers = Object.keys(data[0]);
+        const csvRows = [];
+        csvRows.push(headers.join(','));
+        for (const row of data) {
+            const values = headers.map(header => {
+                const val = row[header];
+                if (val === null || val === undefined)
+                    return '';
+                const str = String(val);
+                // Quote the field if it contains a comma, newline, or double-quote
+                if (str.includes(',') || str.includes('\n') || str.includes('\r') || str.includes('"')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            });
+            csvRows.push(values.join(','));
+        }
+        const csvData = csvRows.join('\n');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=export_${type}_${new Date().getTime()}.csv`);
+        res.send(csvData);
+        await adminAudit(req, 'csv_export', 'export', 0, `Exported ${type} to CSV`);
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Failed to generate CSV export' });
     }
 });
 export default router;

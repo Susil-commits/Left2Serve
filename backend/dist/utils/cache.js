@@ -8,7 +8,9 @@ export const cacheMiddleware = (durationSecs) => {
         if (req.method !== 'GET') {
             return next();
         }
-        const key = `__express__${req.originalUrl || req.url}`;
+        // Include role in cache key to prevent leaking higher-privilege data to lower-privilege users
+        const roleKey = req.user?.role ? `_${req.user.role}` : '';
+        const key = `__express__${req.originalUrl || req.url}${roleKey}`;
         const cachedResponse = cache.get(key);
         if (cachedResponse) {
             res.setHeader('X-Cache', 'HIT');

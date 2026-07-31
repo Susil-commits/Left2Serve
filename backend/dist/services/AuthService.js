@@ -62,10 +62,8 @@ export class AuthService {
                 throw new AppError(401, 'Invalid two-factor authentication code');
             }
         }
-        if (user.locked_until)
-            await run('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?', [user.id]);
-        else
-            await run('UPDATE users SET failed_attempts = 0 WHERE id = ?', [user.id]);
+        // Always clear failed attempts and any lingering lock on successful login
+        await run('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?', [user.id]);
         const token = this.signToken(user);
         const { password_hash, token_version, failed_attempts, locked_until, is_active, two_factor_secret, ...safeUser } = user;
         await audit({ actorId: user.id, actorRole: user.role, action: 'login_success', ip });
@@ -110,7 +108,7 @@ export class AuthService {
         return { message: 'Two-factor authentication disabled' };
     }
     static async getMe(userId) {
-        const user = await get('SELECT id, name, email, role, phone, address, organization, avatar_url, two_factor_enabled, created_at FROM users WHERE id = ?', [userId]);
+        const user = await get('SELECT id, name, email, role, phone, address, organization, avatar_url, two_factor_enabled, badges, meals_saved, created_at FROM users WHERE id = ?', [userId]);
         if (!user)
             throw new AppError(404, 'User not found');
         return user;
