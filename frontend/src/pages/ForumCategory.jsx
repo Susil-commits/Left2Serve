@@ -73,9 +73,10 @@ export default function ForumCategory() {
   let canWrite = false;
   try {
     const roles = typeof category.write_roles === 'string' ? JSON.parse(category.write_roles) : category.write_roles;
-    canWrite = roles.includes(user.role);
-    // eslint-disable-next-line no-unused-vars
-  } catch (err) { /* ignore */ }
+    canWrite = (roles || []).includes(user?.role);
+  } catch (err) { 
+    canWrite = false;
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-transition">

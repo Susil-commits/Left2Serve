@@ -28,6 +28,20 @@ export class ListingService {
     if (lat && lng && distance) {
       const radius = Number(distance);
       if (!isNaN(Number(lat)) && !isNaN(Number(lng)) && !isNaN(radius)) {
+        // Fast bounding box pre-filter
+        const latDelta = radius / 111.045;
+        const lngDelta = radius / (111.045 * Math.cos(Number(lat) * (Math.PI / 180)));
+        const minLat = Number(lat) - latDelta;
+        const maxLat = Number(lat) + latDelta;
+        const minLng = Number(lng) - lngDelta;
+        const maxLng = Number(lng) + lngDelta;
+        
+        query += ` AND fl.latitude BETWEEN ? AND ? AND fl.longitude BETWEEN ? AND ?`;
+        countQuery += ` AND fl.latitude BETWEEN ? AND ? AND fl.longitude BETWEEN ? AND ?`;
+        params.push(minLat, maxLat, minLng, maxLng);
+        countParams.push(minLat, maxLat, minLng, maxLng);
+
+        // Exact distance check
         const mysqlDistanceSql = `( 6371 * acos(LEAST(1.0, GREATEST(-1.0, cos(radians(?)) * cos(radians(fl.latitude)) * cos(radians(fl.longitude) - radians(?)) + sin(radians(?)) * sin(radians(fl.latitude))))) )`;
         query += ` AND ${mysqlDistanceSql} <= ?`;
         countQuery += ` AND ${mysqlDistanceSql} <= ?`;

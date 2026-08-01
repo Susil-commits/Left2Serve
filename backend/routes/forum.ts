@@ -18,7 +18,7 @@ const replySchema = z.object({
 });
 
 // GET all categories accessible to user
-router.get('/categories', authMiddleware, cacheMiddleware(300), async (req: Request, res: Response): Promise<any> => {
+router.get('/categories', authMiddleware, cacheMiddleware(300), async (req: Request, res: Response, next): Promise<any> => {
   try {
     const role = req.user!.role;
     const categories = await all('SELECT * FROM forum_categories ORDER BY id ASC');
@@ -30,13 +30,11 @@ router.get('/categories', authMiddleware, cacheMiddleware(300), async (req: Requ
       } catch { return false; }
     });
     res.json(accessible);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch categories' });
-  }
+  } catch (err) { next(err); }
 });
 
 // GET posts in a category
-router.get('/categories/:id/posts', authMiddleware, cacheMiddleware(60), validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
+router.get('/categories/:id/posts', authMiddleware, cacheMiddleware(60), validateIdParam('id'), async (req: Request, res: Response, next): Promise<any> => {
   try {
     const category = await get('SELECT * FROM forum_categories WHERE id = ?', [req.params.id]);
     if (!category) return res.status(404).json({ error: 'Category not found' });
@@ -58,13 +56,11 @@ router.get('/categories/:id/posts', authMiddleware, cacheMiddleware(60), validat
     `, [category.id]);
     
     res.json({ category, posts });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch posts' });
-  }
+  } catch (err) { next(err); }
 });
 
 // POST new post in a category
-router.post('/categories/:id/posts', authMiddleware, validateIdParam('id'), validate(postSchema), async (req: Request, res: Response): Promise<any> => {
+router.post('/categories/:id/posts', authMiddleware, validateIdParam('id'), validate(postSchema), async (req: Request, res: Response, next): Promise<any> => {
   const { title, content } = req.body;
   
   try {
@@ -85,13 +81,11 @@ router.post('/categories/:id/posts', authMiddleware, validateIdParam('id'), vali
     
     const post = await get('SELECT * FROM forum_posts WHERE id = ?', [id]);
     res.status(201).json(post);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create post' });
-  }
+  } catch (err) { next(err); }
 });
 
 // GET single post and its replies
-router.get('/posts/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
+router.get('/posts/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response, next): Promise<any> => {
   try {
     const post = await get(`
       SELECT p.*, u.name as author_name, u.role as author_role, c.read_roles
@@ -121,13 +115,11 @@ router.get('/posts/:id', authMiddleware, validateIdParam('id'), async (req: Requ
     `, [post.id]);
     
     res.json({ post, replies });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch post details' });
-  }
+  } catch (err) { next(err); }
 });
 
 // POST reply to a post
-router.post('/posts/:id/replies', authMiddleware, validateIdParam('id'), validate(replySchema), async (req: Request, res: Response): Promise<any> => {
+router.post('/posts/:id/replies', authMiddleware, validateIdParam('id'), validate(replySchema), async (req: Request, res: Response, next): Promise<any> => {
   const { content } = req.body;
   
   try {
@@ -160,13 +152,11 @@ router.post('/posts/:id/replies', authMiddleware, validateIdParam('id'), validat
     `, [replyId]);
     
     res.status(201).json(reply);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to post reply' });
-  }
+  } catch (err) { next(err); }
 });
 
 // PUT edit reply
-router.put('/replies/:id', authMiddleware, validateIdParam('id'), validate(replySchema), async (req: Request, res: Response): Promise<any> => {
+router.put('/replies/:id', authMiddleware, validateIdParam('id'), validate(replySchema), async (req: Request, res: Response, next): Promise<any> => {
   const { content } = req.body;
   
   try {
@@ -186,13 +176,11 @@ router.put('/replies/:id', authMiddleware, validateIdParam('id'), validate(reply
     `, [req.params.id]);
     
     res.json(updated);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to edit reply' });
-  }
+  } catch (err) { next(err); }
 });
 
 // DELETE reply
-router.delete('/replies/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
+router.delete('/replies/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response, next): Promise<any> => {
   try {
     const reply = await get('SELECT * FROM forum_replies WHERE id = ?', [req.params.id]);
     if (!reply) return res.status(404).json({ error: 'Reply not found' });
@@ -203,13 +191,11 @@ router.delete('/replies/:id', authMiddleware, validateIdParam('id'), async (req:
 
     await run('DELETE FROM forum_replies WHERE id = ?', [req.params.id]);
     res.json({ message: 'Reply deleted' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete reply' });
-  }
+  } catch (err) { next(err); }
 });
 
 // PUT edit post
-router.put('/posts/:id', authMiddleware, validateIdParam('id'), validate(postSchema), async (req: Request, res: Response): Promise<any> => {
+router.put('/posts/:id', authMiddleware, validateIdParam('id'), validate(postSchema), async (req: Request, res: Response, next): Promise<any> => {
   const { title, content } = req.body;
   
   try {
@@ -229,13 +215,11 @@ router.put('/posts/:id', authMiddleware, validateIdParam('id'), validate(postSch
     `, [req.params.id]);
     
     res.json(updated);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to edit post' });
-  }
+  } catch (err) { next(err); }
 });
 
 // DELETE post
-router.delete('/posts/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
+router.delete('/posts/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response, next): Promise<any> => {
   try {
     const post = await get('SELECT * FROM forum_posts WHERE id = ?', [req.params.id]);
     if (!post) return res.status(404).json({ error: 'Post not found' });
@@ -246,9 +230,7 @@ router.delete('/posts/:id', authMiddleware, validateIdParam('id'), async (req: R
 
     await run('DELETE FROM forum_posts WHERE id = ?', [req.params.id]);
     res.json({ message: 'Post deleted' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete post' });
-  }
+  } catch (err) { next(err); }
 });
 
 export default router;

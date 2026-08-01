@@ -5,7 +5,7 @@ import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', authMiddleware, async (req: Request, res: Response) => {
+router.get('/', authMiddleware, async (req: Request, res: Response, next) => {
   try {
     const notifications = await all(
       'SELECT id, type, title, message, data, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 30',
@@ -17,7 +17,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-router.get('/unread-count', authMiddleware, async (req: Request, res: Response) => {
+router.get('/unread-count', authMiddleware, async (req: Request, res: Response, next) => {
   try {
     const row = await get(
       'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
@@ -29,7 +29,7 @@ router.get('/unread-count', authMiddleware, async (req: Request, res: Response) 
   }
 });
 
-router.patch('/read-all', authMiddleware, async (req: Request, res: Response) => {
+router.patch('/read-all', authMiddleware, async (req: Request, res: Response, next) => {
   try {
     await run('UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE', [req.user!.id]);
     res.json({ message: 'All notifications marked as read' });
@@ -38,7 +38,7 @@ router.patch('/read-all', authMiddleware, async (req: Request, res: Response) =>
   }
 });
 
-router.patch('/:id/read', authMiddleware, async (req: Request, res: Response) => {
+router.patch('/:id/read', authMiddleware, async (req: Request, res: Response, next) => {
   try {
     const notification = await get('SELECT * FROM notifications WHERE id = ? AND user_id = ?', [req.params.id, req.user!.id]);
     if (!notification) return res.status(404).json({ error: 'Notification not found' });
@@ -49,7 +49,7 @@ router.patch('/:id/read', authMiddleware, async (req: Request, res: Response) =>
   }
 });
 
-router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, async (req: Request, res: Response, next) => {
   try {
     const notification = await get('SELECT * FROM notifications WHERE id = ? AND user_id = ?', [req.params.id, req.user!.id]);
     if (!notification) return res.status(404).json({ error: 'Notification not found' });

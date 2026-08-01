@@ -47,7 +47,7 @@ function uploadToCloudinary(buffer: Buffer) {
   });
 }
 
-router.post('/upload', authMiddleware, upload.array('images', 5), async (req: Request, res: Response) => {
+router.post('/upload', authMiddleware, upload.array('images', 5), async (req: Request, res: Response, next) => {
   try {
     const urls = [];
     const files = req.files as Express.Multer.File[];
@@ -135,25 +135,21 @@ router.get('/analytics/me', authMiddleware, roleMiddleware('donor'), async (req:
   }
 });
 
-router.get('/mine', authMiddleware, async (req: Request, res: Response) => {
+router.get('/mine', authMiddleware, async (req: Request, res: Response, next) => {
   try {
     const listings = await all(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.user_id = ? AND fl.is_template = false ORDER BY fl.created_at DESC`, [req.user!.id]);
     res.json(listings.map(withRemaining));
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch your listings' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.get('/templates', authMiddleware, async (req: Request, res: Response) => {
+router.get('/templates', authMiddleware, async (req: Request, res: Response, next) => {
   try {
     const templates = await all(`SELECT * FROM food_listings WHERE user_id = ? AND is_template = true ORDER BY created_at DESC`, [req.user!.id]);
     res.json(templates);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch templates' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.get('/stats', cacheMiddleware(300), async (req: Request, res: Response) => {
+router.get('/stats', cacheMiddleware(300), async (req: Request, res: Response, next) => {
   try {
     const [listingsRow] = await all("SELECT COUNT(*) as count FROM food_listings WHERE status = 'available'");
     const [donorsRow] = await all("SELECT COUNT(*) as count FROM users WHERE role = 'donor'");
@@ -165,12 +161,10 @@ router.get('/stats', cacheMiddleware(300), async (req: Request, res: Response) =
       totalReceivers: receiversRow.count,
       mealsSaved: mealsRow.total,
     });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch stats' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.get('/impact', cacheMiddleware(300), async (req: Request, res: Response) => {
+router.get('/impact', cacheMiddleware(300), async (req: Request, res: Response, next) => {
   try {
     const [mealsRow] = await all("SELECT COALESCE(SUM(quantity), 0) as total FROM reservations WHERE status = 'collected'");
     const [listingsRow] = await all('SELECT COUNT(*) as count FROM food_listings');
@@ -187,12 +181,10 @@ router.get('/impact', cacheMiddleware(300), async (req: Request, res: Response) 
       totalDonors: donorsRow.count,
       totalReceivers: receiversRow.count,
     });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch impact' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.get('/:id', optionalAuth, validateIdParam('id'), async (req: Request, res: Response) => {
+router.get('/:id', optionalAuth, validateIdParam('id'), async (req: Request, res: Response, next) => {
   try {
     const listing = await get(`SELECT fl.*, u.name as donor_name, u.organization as donor_org, u.phone as donor_phone, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE fl.id = ?`, [req.params.id]);
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
@@ -206,9 +198,7 @@ router.get('/:id', optionalAuth, validateIdParam('id'), async (req: Request, res
     }
     if (!canSeeDonorContact) delete out.donor_phone;
     res.json(out);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch listing' });
-  }
+  } catch (err) { next(err); }
 });
 
 const listingSchema = z.object({
@@ -243,7 +233,7 @@ const updateListingSchema = listingSchema.partial().extend({
   status: z.enum(['available', 'reserved', 'collected', 'expired', 'cancelled']).optional()
 });
 
-router.put('/:id', authMiddleware, validateIdParam('id'), validate(updateListingSchema), async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, validateIdParam('id'), validate(updateListingSchema), async (req: Request, res: Response, next) => {
   try {
     const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
@@ -263,10 +253,10 @@ router.put('/:id', authMiddleware, validateIdParam('id'), validate(updateListing
     await recomputeListingStatus(req.params.id as string);
     const updated = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [req.params.id]);
     res.json(withRemaining(updated));
-  } catch (err) { res.status(500).json({ error: 'Failed to update listing' }); }
+  } catch (err) { next(err); }
 });
 
-router.delete('/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response, next) => {
   try {
     const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
@@ -275,10 +265,10 @@ router.delete('/:id', authMiddleware, validateIdParam('id'), async (req: Request
     if (active.count > 0) return res.status(409).json({ error: 'Cannot delete a listing with active reservations. Cancel them first.' });
     await run('DELETE FROM food_listings WHERE id = ?', [req.params.id]);
     res.json({ message: 'Listing deleted' });
-  } catch (err) { res.status(500).json({ error: 'Failed to delete listing' }); }
+  } catch (err) { next(err); }
 });
 
-router.post('/:id/close', authMiddleware, validateIdParam('id'), async (req: Request, res: Response) => {
+router.post('/:id/close', authMiddleware, validateIdParam('id'), async (req: Request, res: Response, next) => {
   try {
     const listing = await get('SELECT * FROM food_listings WHERE id = ?', [req.params.id]);
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
@@ -288,7 +278,7 @@ router.post('/:id/close', authMiddleware, validateIdParam('id'), async (req: Req
     if (active.count > 0) return res.status(409).json({ error: 'Cannot close a listing with pending or approved reservations' });
     await run("UPDATE food_listings SET status = 'collected' WHERE id = ?", [req.params.id]);
     res.json({ message: 'Listing marked as donated' });
-  } catch (err) { res.status(500).json({ error: 'Failed to close listing' }); }
+  } catch (err) { next(err); }
 });
 
 export default router;

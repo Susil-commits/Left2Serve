@@ -45,6 +45,17 @@ export default defineConfig({
     }),
     visualizer({ filename: 'stats-before.html' })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': ['lucide-react', 'recharts', 'framer-motion'],
+          'vendor-maps': ['react-leaflet', 'leaflet']
+        }
+      }
+    }
+  },
   server: {
     proxy: {
       '/api': 'http://localhost:5000'

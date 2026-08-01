@@ -31,9 +31,12 @@ const AnimatedStat = ({ value, label, suffix = '+' }) => {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.5 });
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
+    let obs = null;
+    if (ref.current) {
+      obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.5 });
+      obs.observe(ref.current);
+    }
+    return () => { if (obs) obs.disconnect(); };
   }, []);
   const count = useCountUp(value, 2000, visible);
   return (
@@ -45,9 +48,12 @@ const AnimatedStatInline = ({ value, suffix = '+' }) => {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.5 });
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
+    let obs = null;
+    if (ref.current) {
+      obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.5 });
+      obs.observe(ref.current);
+    }
+    return () => { if (obs) obs.disconnect(); };
   }, []);
   const count = useCountUp(value, 2000, visible);
   return <span ref={ref} className="highlight-number">{count.toLocaleString()}{suffix}</span>;

@@ -10,13 +10,11 @@ const router = Router();
 router.use(authMiddleware);
 router.use(roleMiddleware('ngo', 'volunteer'));
 
-router.get('/', async (req: Request, res: Response): Promise<any> => {
+router.get('/', async (req: Request, res: Response, next): Promise<any> => {
   try {
     const lists = await all('SELECT * FROM watchlists WHERE user_id = ? ORDER BY created_at DESC', [req.user!.id]);
     res.json(lists);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch watchlists' });
-  }
+  } catch (err) { next(err); }
 });
 
 const watchlistSchema = z.object({
@@ -26,7 +24,7 @@ const watchlistSchema = z.object({
   radius_km: z.preprocess((val) => Number(val) || 10, z.number().positive())
 });
 
-router.post('/', validate(watchlistSchema), async (req: Request, res: Response): Promise<any> => {
+router.post('/', validate(watchlistSchema), async (req: Request, res: Response, next): Promise<any> => {
   const { keyword, latitude, longitude, radius_km } = req.body;
   try {
     const id = await insert(
@@ -35,21 +33,17 @@ router.post('/', validate(watchlistSchema), async (req: Request, res: Response):
     );
     const w = await get('SELECT * FROM watchlists WHERE id = ?', [id]);
     res.status(201).json(w);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create watchlist' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.delete('/:id', validateIdParam('id'), async (req: Request, res: Response): Promise<any> => {
+router.delete('/:id', validateIdParam('id'), async (req: Request, res: Response, next): Promise<any> => {
   const item = await get('SELECT * FROM watchlists WHERE id = ?', [req.params.id]);
   if (!item) return res.status(404).json({ error: 'Not found' });
   if (item.user_id !== req.user!.id) return res.status(403).json({ error: 'Not authorized' });
   try {
     await run('DELETE FROM watchlists WHERE id = ?', [req.params.id]);
     res.json({ message: 'Deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete' });
-  }
+  } catch (err) { next(err); }
 });
 
 export default router;

@@ -19,7 +19,7 @@ function adminAudit(req, action, targetType, targetId, detail) {
   return audit({ actorRole: 'admin', action, targetType, targetId, detail, ip: req.ip });
 }
 
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response, next) => {
   const { adminCode } = req.body;
   if (!ADMIN_CODE) return res.status(503).json({ error: 'Admin access is not configured' });
   if (!adminCode) return res.status(400).json({ error: 'Admin code is required' });
@@ -28,7 +28,7 @@ router.post('/login', async (req: Request, res: Response) => {
   res.json({ token, user: { id: 0, name: 'Administrator', email: 'admin@left2serve.com', role: 'admin' } });
 });
 
-router.get('/stats', authMiddleware, roleMiddleware('admin'), cacheMiddleware(60), async (req: Request, res: Response) => {
+router.get('/stats', authMiddleware, roleMiddleware('admin'), cacheMiddleware(60), async (req: Request, res: Response, next) => {
   try {
     const [usersRow] = await all('SELECT COUNT(*) as count FROM users');
     const [ngosRow] = await all("SELECT COUNT(*) as count FROM users WHERE role = 'ngo'");
@@ -54,54 +54,50 @@ router.get('/stats', authMiddleware, roleMiddleware('admin'), cacheMiddleware(60
       collectedReservations: collectedReservationsRow.count,
       mealsSaved: mealsSavedRow.total,
     });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch stats' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.get('/users', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
+router.get('/users', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response, next) => {
   try {
-    const users = await all('SELECT id, name, email, role, phone, address, organization, is_active, created_at FROM users ORDER BY created_at DESC');
+    const users = await all('SELECT id, name, email, role, phone, address, organization, is_active, created_at FROM users ORDER BY created_at DESC LIMIT 500');
     res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch users' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.get('/ngos', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
+router.get('/ngos', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response, next) => {
   try {
-    const ngos = await all("SELECT id, name, email, phone, address, organization, is_active, created_at FROM users WHERE role = 'ngo' ORDER BY created_at DESC");
-    const ngosWithStats = await Promise.all(ngos.map(async (ngo) => {
-      const [reservations] = await all('SELECT COUNT(*) as count FROM reservations WHERE user_id = ?', [ngo.id]);
-      const [pending] = await all("SELECT COUNT(*) as count FROM reservations WHERE user_id = ? AND status = 'pending'", [ngo.id]);
-      const [collected] = await all("SELECT COUNT(*) as count FROM reservations WHERE user_id = ? AND status = 'collected'", [ngo.id]);
-      return { ...ngo, totalReservations: reservations.count, pendingReservations: pending.count, collectedReservations: collected.count };
-    }));
-    res.json(ngosWithStats);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch NGOs' });
-  }
+    const ngos = await all(`
+      SELECT 
+        u.id, u.name, u.email, u.phone, u.address, u.organization, u.is_active, u.created_at,
+        COUNT(r.id) as "totalReservations",
+        COUNT(CASE WHEN r.status = 'pending' THEN 1 END) as "pendingReservations",
+        COUNT(CASE WHEN r.status = 'collected' THEN 1 END) as "collectedReservations"
+      FROM users u
+      LEFT JOIN reservations r ON u.id = r.user_id
+      WHERE u.role = 'ngo'
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
+      LIMIT 500
+    `);
+    res.json(ngos);
+  } catch (err) { next(err); }
 });
 
-router.get('/orders', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
+router.get('/orders', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response, next) => {
   try {
-    const orders = await all(`SELECT r.*, fl.title as food_title, fl.category as food_category, fl.quantity as food_quantity, fl.unit as food_unit, fl.pickup_address, fl.expiry_date, fl.status as listing_status, u.name as reserver_name, u.email as reserver_email, u.phone as reserver_phone, u.organization as reserver_org, d.name as donor_name, d.email as donor_email FROM reservations r JOIN food_listings fl ON r.food_listing_id = fl.id JOIN users u ON r.user_id = u.id JOIN users d ON fl.user_id = d.id ORDER BY r.created_at DESC`);
+    const orders = await all(`SELECT r.*, fl.title as food_title, fl.category as food_category, fl.quantity as food_quantity, fl.unit as food_unit, fl.pickup_address, fl.expiry_date, fl.status as listing_status, u.name as reserver_name, u.email as reserver_email, u.phone as reserver_phone, u.organization as reserver_org, d.name as donor_name, d.email as donor_email FROM reservations r JOIN food_listings fl ON r.food_listing_id = fl.id JOIN users u ON r.user_id = u.id JOIN users d ON fl.user_id = d.id ORDER BY r.created_at DESC LIMIT 500`);
     res.json(orders);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch orders' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.get('/listings', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
+router.get('/listings', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response, next) => {
   try {
-    const listings = await all(`SELECT fl.*, u.name as donor_name, u.email as donor_email, u.phone as donor_phone, u.organization as donor_org FROM food_listings fl JOIN users u ON fl.user_id = u.id ORDER BY fl.created_at DESC`);
+    const listings = await all(`SELECT fl.*, u.name as donor_name, u.email as donor_email, u.phone as donor_phone, u.organization as donor_org FROM food_listings fl JOIN users u ON fl.user_id = u.id ORDER BY fl.created_at DESC LIMIT 500`);
     res.json(listings.map(l => ({ ...l, image_urls: l.image_urls || [] })));
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch listings' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.delete('/listings/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response) => {
+router.delete('/listings/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response, next) => {
   try {
     const listing = await get('SELECT id, user_id, title, status FROM food_listings WHERE id = ?', [req.params.id]);
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
@@ -109,12 +105,10 @@ router.delete('/listings/:id', authMiddleware, roleMiddleware('admin'), validate
     await createNotification(listing.user_id, 'listing_removed', 'Listing removed', `An admin removed your listing "${listing.title}".`, { listingId: Number(req.params.id) });
     await adminAudit(req, 'listing_delete', 'listing', Number(req.params.id), `removed listing "${listing.title}" (${listing.status})`);
     res.json({ message: 'Listing deleted' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete listing' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response) => {
+router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response, next) => {
   try {
     const { status } = req.body;
     const allowed = ['approved', 'collected', 'cancelled'];
@@ -131,12 +125,10 @@ router.patch('/orders/:id', authMiddleware, roleMiddleware('admin'), validateIdP
     else if (status === 'cancelled') await createNotification(reservation.user_id, 'reservation_cancelled', 'Reservation cancelled', `Admin cancelled your reservation for "${title}".`, ctx);
     await adminAudit(req, `order_${status}`, 'reservation', Number(req.params.id), `order #${req.params.id} -> ${status}`);
     res.json({ message: 'Order updated' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update order' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.patch('/users/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response) => {
+router.patch('/users/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response, next) => {
   try {
     const { role, isActive } = req.body;
     const user = await get('SELECT id, role, is_active FROM users WHERE id = ?', [req.params.id]);
@@ -161,12 +153,10 @@ router.patch('/users/:id', authMiddleware, roleMiddleware('admin'), validateIdPa
     await adminAudit(req, 'user_update', 'user', Number(req.params.id), detail);
     const updated = await get('SELECT id, name, email, role, phone, address, organization, is_active, created_at FROM users WHERE id = ?', [req.params.id]);
     res.json(updated);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update user' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.delete('/users/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response) => {
+router.delete('/users/:id', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response, next) => {
   try {
     const user = await get('SELECT id, role FROM users WHERE id = ?', [req.params.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -174,12 +164,10 @@ router.delete('/users/:id', authMiddleware, roleMiddleware('admin'), validateIdP
     await run('DELETE FROM users WHERE id = ?', [req.params.id]);
     await adminAudit(req, 'user_delete', 'user', Number(req.params.id), `deleted user #${req.params.id}`);
     res.json({ message: 'User deleted' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete user' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response) => {
+router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), validateIdParam('id'), async (req: Request, res: Response, next) => {
   try {
     const user = await get('SELECT id, role, email FROM users WHERE id = ?', [req.params.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -197,12 +185,10 @@ router.patch('/users/:id/password', authMiddleware, roleMiddleware('admin'), val
     await createNotification(user.id, 'password_reset', 'Password reset', 'An administrator reset your password. Please log in with the new password provided to you.', {});
     await adminAudit(req, 'password_reset', 'user', Number(req.params.id), `reset password for ${user.email}`);
     res.json({ message: 'Password reset. The user will need to log in again.', password: provided ? undefined : password });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to reset password' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.get('/trends', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
+router.get('/trends', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response, next) => {
   try {
     const days = Math.min(parseInt((req.query.days as string)) || 14, 90);
     const reservations = await all(
@@ -229,12 +215,10 @@ router.get('/trends', authMiddleware, roleMiddleware('admin'), async (req: Reque
       `SELECT category, COUNT(*) as count FROM food_listings GROUP BY category ORDER BY count DESC`
     );
     res.json({ series, byCategory });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch trends' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.get('/audit-log', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
+router.get('/audit-log', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response, next) => {
   try {
     const limit = Math.min(parseInt((req.query.limit as string)) || 50, 200);
     const logs = await all(
@@ -242,12 +226,10 @@ router.get('/audit-log', authMiddleware, roleMiddleware('admin'), async (req: Re
       [limit]
     );
     res.json(logs);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch audit log' });
-  }
+  } catch (err) { next(err); }
 });
 
-router.get('/export', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response) => {
+router.get('/export', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response, next) => {
   try {
     const type = req.query.type as string;
     if (!['users', 'listings', 'reservations'].includes(type)) {
@@ -290,9 +272,7 @@ router.get('/export', authMiddleware, roleMiddleware('admin'), async (req: Reque
     res.send(csvData);
 
     await adminAudit(req, 'csv_export', 'export', 0, `Exported ${type} to CSV`);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to generate CSV export' });
-  }
+  } catch (err) { next(err); }
 });
 
 export default router;

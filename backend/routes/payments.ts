@@ -60,7 +60,7 @@ router.post('/config', (req: Request, res: Response) => {
   res.json({ configured: RAZORPAY_CONFIGURED, key_id: RAZORPAY_CONFIGURED ? KEY_ID : null });
 });
 
-router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'), validate(createOrderSchema), async (req: Request, res: Response) => {
+router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'), validate(createOrderSchema), async (req: Request, res: Response, next) => {
   if (!RAZORPAY_CONFIGURED) return res.status(503).json({ error: 'Razorpay is not configured on the server' });
   const { food_listing_id, quantity, pickup_time, notes } = req.body;
   const qty = Number(quantity);
@@ -115,7 +115,7 @@ router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'),
   }
 });
 
-router.post('/verify', authMiddleware, roleMiddleware('ngo', 'volunteer'), validate(verifySchema), async (req: Request, res: Response) => {
+router.post('/verify', authMiddleware, roleMiddleware('ngo', 'volunteer'), validate(verifySchema), async (req: Request, res: Response, next) => {
   if (!RAZORPAY_CONFIGURED) return res.status(503).json({ error: 'Razorpay is not configured on the server' });
   const { reservation_id, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
   try {

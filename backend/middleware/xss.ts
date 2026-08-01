@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import xss from 'xss';
 
-const sanitize = (data: any): any => {
+const sanitize = (data: any, keyName?: string): any => {
+  if (keyName && ['password', 'newPassword', 'current'].includes(keyName)) {
+    return data;
+  }
   if (typeof data === 'string') {
     return xss(data);
   }
@@ -12,7 +15,7 @@ const sanitize = (data: any): any => {
     const sanitizedObj: any = {};
     for (const key in data) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
-        sanitizedObj[key] = sanitize(data[key]);
+        sanitizedObj[key] = sanitize(data[key], key);
       }
     }
     return sanitizedObj;

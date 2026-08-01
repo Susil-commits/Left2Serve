@@ -4,7 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/:reservationId', authMiddleware, async (req: Request, res: Response): Promise<any> => {
+router.get('/:reservationId', authMiddleware, async (req: Request, res: Response, next): Promise<any> => {
   const reservationId = req.params.reservationId;
   const reservation = await get('SELECT * FROM reservations WHERE id = ?', [reservationId]);
   if (!reservation) return res.status(404).json({ error: 'Reservation not found' });
@@ -29,9 +29,7 @@ router.get('/:reservationId', authMiddleware, async (req: Request, res: Response
     `, [reservationId]);
 
     res.json(messages);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch messages' });
-  }
+  } catch (err) { next(err); }
 });
 
 export default router;

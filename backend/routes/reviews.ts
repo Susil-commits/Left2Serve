@@ -14,7 +14,7 @@ const reviewSchema = z.object({
   comment: z.string().max(500, 'Comment is too long (max 500 chars)').optional().nullable()
 });
 
-router.post('/', authMiddleware, validate(reviewSchema), async (req: Request, res: Response) => {
+router.post('/', authMiddleware, validate(reviewSchema), async (req: Request, res: Response, next) => {
   const { reservationId, rating, comment } = req.body;
   const r = Number(rating);
   try {
@@ -36,10 +36,10 @@ router.post('/', authMiddleware, validate(reviewSchema), async (req: Request, re
     );
     const review = await get('SELECT * FROM reviews WHERE id = ?', [id]);
     res.status(201).json(review);
-  } catch (err) { res.status(500).json({ error: 'Failed to submit review' }); }
+  } catch (err) { next(err); }
 });
 
-router.get('/reservation/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response) => {
+router.get('/reservation/:id', authMiddleware, validateIdParam('id'), async (req: Request, res: Response, next) => {
   try {
     const reservation = await get('SELECT * FROM reservations WHERE id = ?', [req.params.id]);
     if (!reservation) return res.status(404).json({ error: 'Reservation not found' });
@@ -53,10 +53,10 @@ router.get('/reservation/:id', authMiddleware, validateIdParam('id'), async (req
     const reviewee = await get('SELECT name, organization, role FROM users WHERE id = ?', [revieweeId]);
     const canReview = reservation.status === 'collected' && !myReview;
     res.json({ canReview, myReview, reviewee, foodTitle: listing.title, reservationId: reservation.id });
-  } catch (err) { res.status(500).json({ error: 'Failed to fetch review status' }); }
+  } catch (err) { next(err); }
 });
 
-router.get('/user/:userId', optionalAuth, validateIdParam('userId'), async (req: Request, res: Response) => {
+router.get('/user/:userId', optionalAuth, validateIdParam('userId'), async (req: Request, res: Response, next) => {
   try {
     const userId = Number(req.params.userId);
     if (!Number.isFinite(userId) || userId <= 0) return res.json({ average: 0, count: 0, reviews: [] });
@@ -71,7 +71,7 @@ router.get('/user/:userId', optionalAuth, validateIdParam('userId'), async (req:
     const count = reviews.length;
     const average = count ? Math.round((reviews.reduce((a, r) => a + Number(r.rating), 0) / count) * 10) / 10 : 0;
     res.json({ average, count, reviews });
-  } catch (err) { res.status(500).json({ error: 'Failed to fetch reviews' }); }
+  } catch (err) { next(err); }
 });
 
 export default router;

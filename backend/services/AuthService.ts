@@ -156,8 +156,36 @@ export class AuthService {
   }
 
   static async updateProfile(userId: number, payload: any) {
-    const { name, phone, address, organization, avatar_url } = payload;
-    await run('UPDATE users SET name = ?, phone = ?, address = ?, organization = ?, avatar_url = ? WHERE id = ?', [name != null ? String(name).trim() : null, phone || null, address || null, organization || null, avatar_url || null, userId]);
+    const fields: string[] = [];
+    const values: any[] = [];
+    
+    if (payload.name !== undefined) {
+      fields.push('name = ?');
+      values.push(payload.name != null ? String(payload.name).trim() : null);
+    }
+    if (payload.phone !== undefined) {
+      fields.push('phone = ?');
+      values.push(payload.phone || null);
+    }
+    if (payload.address !== undefined) {
+      fields.push('address = ?');
+      values.push(payload.address || null);
+    }
+    if (payload.organization !== undefined) {
+      fields.push('organization = ?');
+      values.push(payload.organization || null);
+    }
+    if (payload.avatar_url !== undefined) {
+      fields.push('avatar_url = ?');
+      values.push(payload.avatar_url || null);
+    }
+
+    if (fields.length > 0) {
+      values.push(userId);
+      const query = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
+      await run(query, values);
+    }
+    
     return await get('SELECT id, name, email, role, phone, address, organization, avatar_url, created_at FROM users WHERE id = ?', [userId]);
   }
 

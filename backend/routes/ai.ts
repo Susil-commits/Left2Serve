@@ -4,7 +4,7 @@ import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
 const router = Router();
 
-router.post('/describe', authMiddleware, roleMiddleware('donor'), async (req: Request, res: Response) => {
+router.post('/describe', authMiddleware, roleMiddleware('donor'), async (req: Request, res: Response, next) => {
   try {
     if (!process.env.GEMINI_API_KEY) {
       return res.status(503).json({ error: 'AI features are not configured' });
