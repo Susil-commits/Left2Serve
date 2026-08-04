@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../components/AuthContext';
@@ -16,21 +16,25 @@ export default function ForumCategory() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    loadPosts();
+    let isMounted = true;
+    loadPosts(isMounted);
+    return () => { isMounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId]);
 
-  async function loadPosts() {
+  const loadPosts = useCallback(async (isMounted = true) => {
     try {
       setLoading(true);
       const res = await api.forum.getCategoryPosts(categoryId);
+      if (!isMounted) return; // component unmounted while fetching — discard result
       setData(res);
     } catch (err) {
+      if (!isMounted) return;
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
-  }
+  }, [categoryId]);
 
   const handleCreatePost = async (e) => {
     e.preventDefault();
@@ -41,7 +45,7 @@ export default function ForumCategory() {
       setNewTitle('');
       setNewContent('');
       setShowNewPost(false);
-      loadPosts(); // Reload to show new post
+      await loadPosts(); // await so errors surface and spinner shows correctly
     } catch (err) {
       alert(err.message || 'Failed to create post');
     } finally {

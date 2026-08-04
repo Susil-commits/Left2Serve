@@ -85,7 +85,7 @@ function buildConfig(): PoolConfig {
 async function getPool(): Promise<Pool> {
   if (pool) return pool;
   const cfg = buildConfig();
-  pool = new Pool({ ...cfg, max: 10 });
+  pool = new Pool({ ...cfg, max: parseInt(process.env.DB_POOL_MAX || '10') });
   // verify connectivity early with a clear error
   const client = await pool.connect();
   client.release();
@@ -118,4 +118,56 @@ async function insert(sql: string, params: any[] = []): Promise<number | null> {
   return rows[0] ? rows[0].id : null;
 }
 
-export { getPool, query, get, all, run, insert };
+/**
+ * Run a callback inside an explicit PostgreSQL transaction.
+ * All DB calls made via the client passed to the callback share the same
+ * connection and are rolled back automatically on any thrown error.
+ *
+ * Example:
+ *   const result = await withTransaction(async (client) => {
+ *     await client.run('INSERT ...');
+ *     return await client.get('SELECT ...');
+ *   });
+ */
+async function withTransaction<T>(
+  fn: (client: {
+    get: typeof get;
+    all: typeof all;
+    run: typeof run;
+    insert: typeof insert;
+  }) => Promise<T>
+): Promise<T> {
+  const p = await getPool();
+  const pgClient = await p.connect();
+  try {
+    await pgClient.query('BEGIN');
+
+    const txGet = async <R = any>(sql: string, params: any[] = []): Promise<R | null> => {
+      const { rows } = await pgClient.query(formatQuery(sql, params), params);
+      return (rows[0] as R) || null;
+    };
+    const txAll = async <R = any>(sql: string, params: any[] = []): Promise<R[]> => {
+      const { rows } = await pgClient.query(formatQuery(sql, params), params);
+      return rows as R[];
+    };
+    const txRun = async (sql: string, params: any[] = []): Promise<void> => {
+      await pgClient.query(formatQuery(sql, params), params);
+    };
+    const txInsert = async (sql: string, params: any[] = []): Promise<number | null> => {
+      const returning = /\bRETURNING\b/i.test(sql) ? sql : `${sql} RETURNING id`;
+      const { rows } = await pgClient.query(formatQuery(returning, params), params);
+      return rows[0] ? rows[0].id : null;
+    };
+
+    const result = await fn({ get: txGet as typeof get, all: txAll as typeof all, run: txRun, insert: txInsert });
+    await pgClient.query('COMMIT');
+    return result;
+  } catch (err) {
+    await pgClient.query('ROLLBACK');
+    throw err;
+  } finally {
+    pgClient.release();
+  }
+}
+
+export { getPool, query, get, all, run, insert, withTransaction };

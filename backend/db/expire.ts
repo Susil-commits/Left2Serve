@@ -1,16 +1,16 @@
-import { run, all } from './database.js';
+import { all, query } from './database.js';
 
-export async function sweepExpiredListings() {
+export async function sweepExpiredListings(): Promise<number> {
   try {
-    const expired = await all(
-      "SELECT id, user_id, title FROM food_listings WHERE status = 'available' AND expiry_date < NOW()"
+    // Atomic single-query approach: UPDATE ... RETURNING eliminates the
+    // SELECT → UPDATE TOCTOU window. Any row that expires between the two
+    // queries in the old approach was silently missed.
+    const rows = await query<{ id: number }>(
+      "UPDATE food_listings SET status = 'expired' WHERE status = 'available' AND expiry_date < NOW() RETURNING id"
     );
-    if (expired.length === 0) return 0;
-    await run(
-      "UPDATE food_listings SET status = 'expired' WHERE status = 'available' AND expiry_date < NOW()"
-    );
-    return expired.length;
-  } catch {
+    return rows.length;
+  } catch (err) {
+    console.error('sweepExpiredListings: failed to sweep expired listings', err);
     return 0;
   }
 }

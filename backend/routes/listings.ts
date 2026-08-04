@@ -24,9 +24,9 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const VALID_CATEGORIES = ['event', 'restaurant', 'hotel', 'caterer', 'household'];
 const MAX_IMAGES = 5;
 
-function sanitizeImageUrls(urls) {
+function sanitizeImageUrls(urls: unknown): string[] {
   if (!Array.isArray(urls)) return [];
-  return urls
+  return (urls as unknown[])
     .map((u) => String(u || ''))
     .filter((u) => /^https:\/\/[^\s'"]+\.(jpg|jpeg|png|webp)(\?[^\s'"]*)?$/i.test(u) || /^https:\/\/res\.cloudinary\.com\/[^\s'"]+$/i.test(u) || /^\/uploads\/left2serve\/[^\s'"]+\.webp$/i.test(u) || /^https:\/\/[^\s'"]+\/uploads\/left2serve\/[^\s'"]+\.webp$/i.test(u))
     .slice(0, MAX_IMAGES);
@@ -69,11 +69,11 @@ router.post('/upload', authMiddleware, upload.array('images', 5), async (req: Re
         }
       }
       
-      // Local fallback
+      // Local fallback — use async write to avoid blocking the event loop
       const dir = path.join(process.cwd(), 'uploads', 'left2serve');
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
-      fs.writeFileSync(path.join(dir, filename), processedBuffer);
+      await fs.promises.writeFile(path.join(dir, filename), processedBuffer);
       
       const base = req.protocol ? `${req.protocol}://${req.get('host')}` : '';
       urls.push(base ? `${base}/uploads/left2serve/${filename}` : `/uploads/left2serve/${filename}`);
@@ -93,8 +93,9 @@ router.get('/', cacheMiddleware(60), async (req: Request, res: Response, next) =
       search: req.query.search,
       sort: req.query.sort,
       dietary: req.query.dietary,
-      page: Math.max(1, parseInt((req.query.page as string)) || 1),
-      limit: Math.min(48, Math.max(1, parseInt((req.query.limit as string)) || 12)),
+      // Guard against parseInt(undefined) → NaN which propagates into LIMIT NaN OFFSET NaN
+      page: Math.max(1, parseInt((req.query.page as string) || '1') || 1),
+      limit: Math.min(48, Math.max(1, parseInt((req.query.limit as string) || '12') || 12)),
       lat: req.query.lat,
       lng: req.query.lng,
       distance: req.query.distance
@@ -245,7 +246,14 @@ router.put('/:id', authMiddleware, validateIdParam('id'), validate(updateListing
     const nextCategory = category || listing.category;
     const nextQty = quantity != null ? Number(quantity) : listing.quantity;
     const nextExpiry = expiry_date || listing.expiry_date;
-    const images = sanitizeImageUrls(image_urls ?? listing.image_urls);
+    // listing.image_urls comes back from PostgreSQL as a JSON string — parse it before
+    // passing to sanitizeImageUrls, which expects an array. Without this, the stored
+    // JSON string would fail the Array.isArray check and return [], wiping all images.
+    const existingImageUrls: unknown[] = (() => {
+      if (Array.isArray(listing.image_urls)) return listing.image_urls;
+      try { return JSON.parse(listing.image_urls); } catch { return []; }
+    })();
+    const images = sanitizeImageUrls(image_urls !== undefined ? image_urls : existingImageUrls);
     const dietaryTags = dietary_preferences !== undefined ? (Array.isArray(dietary_preferences) ? dietary_preferences : []) : listing.dietary_preferences;
     const lat = latitude !== undefined ? (latitude ? Number(latitude) : null) : listing.latitude;
     const lng = longitude !== undefined ? (longitude ? Number(longitude) : null) : listing.longitude;

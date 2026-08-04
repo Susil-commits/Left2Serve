@@ -116,8 +116,14 @@ app.use(errorHandler);
 
 export const io = new SocketIOServer(server, {
   cors: {
-    origin: Array.from(allowedOrigins),
-    credentials: true
+    // Mirror the exact same origin-allow logic used for HTTP CORS so that
+    // *.vercel.app preview deployments (which pass the HTTP check via regex)
+    // are not silently rejected by Socket.IO's stricter static-array check.
+    origin: (origin, cb) => corsOrigin(origin, (err, allow) => {
+      if (err) cb(err);
+      else cb(null, allow ? origin : false);
+    }),
+    credentials: true,
   }
 });
 

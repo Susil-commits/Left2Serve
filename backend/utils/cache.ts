@@ -19,6 +19,7 @@ export const cacheMiddleware = (durationSecs: number) => {
 
     if (cachedResponse) {
       res.setHeader('X-Cache', 'HIT');
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.send(cachedResponse);
     }
 

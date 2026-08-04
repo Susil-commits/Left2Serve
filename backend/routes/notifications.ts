@@ -12,8 +12,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response, next) => {
       [req.user!.id]
     );
     res.json(notifications.map((n) => ({ ...n, data: n.data || {} })));
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch notifications' });
+  } catch (err) {
+    next(err);
   }
 });
 
@@ -24,8 +24,8 @@ router.get('/unread-count', authMiddleware, async (req: Request, res: Response, 
       [req.user!.id]
     );
     res.json({ count: row ? row.count : 0 });
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch unread count' });
+  } catch (err) {
+    next(err);
   }
 });
 
@@ -33,8 +33,8 @@ router.patch('/read-all', authMiddleware, async (req: Request, res: Response, ne
   try {
     await run('UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE', [req.user!.id]);
     res.json({ message: 'All notifications marked as read' });
-  } catch {
-    res.status(500).json({ error: 'Failed to mark notifications as read' });
+  } catch (err) {
+    next(err);
   }
 });
 
@@ -44,8 +44,8 @@ router.patch('/:id/read', authMiddleware, async (req: Request, res: Response, ne
     if (!notification) return res.status(404).json({ error: 'Notification not found' });
     await run('UPDATE notifications SET is_read = TRUE WHERE id = ?', [req.params.id]);
     res.json({ message: 'Notification marked as read' });
-  } catch {
-    res.status(500).json({ error: 'Failed to mark notification as read' });
+  } catch (err) {
+    next(err);
   }
 });
 
@@ -55,8 +55,8 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response, next) 
     if (!notification) return res.status(404).json({ error: 'Notification not found' });
     await run('DELETE FROM notifications WHERE id = ?', [req.params.id]);
     res.json({ message: 'Notification deleted' });
-  } catch {
-    res.status(500).json({ error: 'Failed to delete notification' });
+  } catch (err) {
+    next(err);
   }
 });
 

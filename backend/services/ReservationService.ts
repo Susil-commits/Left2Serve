@@ -1,4 +1,4 @@
-import { get, all, insert, run } from '../db/database.js';
+import { get, all, insert, run, withTransaction } from '../db/database.js';
 import { getAvailability, recomputeListingStatus } from '../db/availability.js';
 import { createNotification } from '../db/notify.js';
 import { sendReservationApprovedEmail, sendOrderUpdateEmail, sendOrderCancelledEmail } from '../utils/email.js';
@@ -10,48 +10,54 @@ export class ReservationService {
     const { food_listing_id, quantity, pickup_time, notes, payment_method } = payload;
     const qty = Number(quantity);
 
-    // Lock the listing row first to prevent concurrent reservations from overbooking.
-    // SELECT FOR UPDATE serializes all reservation attempts for the same listing.
-    const listing = await get('SELECT * FROM food_listings WHERE id = ? FOR UPDATE', [food_listing_id]);
-    if (!listing) throw new AppError(404, 'Listing not found');
-    if (listing.status !== 'available') throw new AppError(400, 'Listing is no longer available');
-    if (new Date(listing.expiry_date) <= new Date()) throw new AppError(400, 'This listing has expired');
+    // Wrap in a transaction so SELECT FOR UPDATE actually holds a row-level lock
+    // and prevents two simultaneous requests from both passing the availability check.
+    return await withTransaction(async (tx) => {
+      // Lock the listing row first to prevent concurrent reservations from overbooking.
+      // SELECT FOR UPDATE serializes all reservation attempts for the same listing.
+      const listing = await tx.get('SELECT * FROM food_listings WHERE id = ? FOR UPDATE', [food_listing_id]);
+      if (!listing) throw new AppError(404, 'Listing not found');
+      if (listing.status !== 'available') throw new AppError(400, 'Listing is no longer available');
+      if (new Date(listing.expiry_date) <= new Date()) throw new AppError(400, 'This listing has expired');
 
-    const { remaining } = await getAvailability(food_listing_id);
-    if (qty > remaining) throw new AppError(400, `Only ${remaining} ${listing.unit} available`);
+      const { remaining } = await getAvailability(food_listing_id);
+      if (qty > remaining) throw new AppError(400, `Only ${remaining} ${listing.unit} available`);
 
-    const [existing] = await all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('pending','approved')", [food_listing_id, userId]);
-    if (existing) throw new AppError(409, 'You already have an active reservation for this listing');
+      const [existing] = await tx.all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('pending','approved')", [food_listing_id, userId]);
+      if (existing) throw new AppError(409, 'You already have an active reservation for this listing');
 
-    const price = Number(listing.price) || 0;
-    const amount = Math.round(price * qty * 100) / 100;
-    let method = 'none';
-    let paymentStatus = 'paid';
+      const price = Number(listing.price) || 0;
+      const amount = Math.round(price * qty * 100) / 100;
+      let method = 'none';
+      let paymentStatus = 'paid';
 
-    if (amount > 0) {
-      if (payment_method === 'razorpay') throw new AppError(400, 'Use the payment endpoint for Razorpay');
-      method = 'cod';
-      paymentStatus = 'pending';
-    }
+      if (amount > 0) {
+        if (payment_method === 'razorpay') throw new AppError(400, 'Use the payment endpoint for Razorpay');
+        method = 'cod';
+        paymentStatus = 'pending';
+      }
 
-    const id = await insert(
-      'INSERT INTO reservations (food_listing_id, user_id, quantity, pickup_time, notes, payment_method, payment_status, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [food_listing_id, userId, qty, pickup_time || null, notes || null, method, paymentStatus, amount]
-    );
-    await recomputeListingStatus(food_listing_id);
+      const id = await tx.insert(
+        'INSERT INTO reservations (food_listing_id, user_id, quantity, pickup_time, notes, payment_method, payment_status, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [food_listing_id, userId, qty, pickup_time || null, notes || null, method, paymentStatus, amount]
+      );
+      await recomputeListingStatus(food_listing_id);
 
-    const reservation = await get('SELECT * FROM reservations WHERE id = ?', [id]);
-    const reserver = await get('SELECT name FROM users WHERE id = ?', [userId]);
+      const reservation = await tx.get('SELECT * FROM reservations WHERE id = ?', [id]);
+      const reserver = await tx.get('SELECT name FROM users WHERE id = ?', [userId]);
 
-    await createNotification(
-      listing.user_id,
-      'reservation_new',
-      'New reservation request',
-      `${reserver?.name || 'Someone'} requested ${qty} ${listing.unit} of "${listing.title}"`,
-      { reservationId: id, listingId: Number(food_listing_id), reserverName: reserver?.name }
-    );
+      // createNotification is fire-and-forget — fine to run after the transaction commits
+      // but we schedule it inside to keep all business logic together.
+      await createNotification(
+        listing.user_id,
+        'reservation_new',
+        'New reservation request',
+        `${reserver?.name || 'Someone'} requested ${qty} ${listing.unit} of "${listing.title}"`,
+        { reservationId: id, listingId: Number(food_listing_id), reserverName: reserver?.name }
+      );
 
-    return reservation;
+      return reservation;
+    });
   }
 
   static async getMyReservations(userId: number) {

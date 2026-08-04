@@ -9,6 +9,13 @@ import { generateSecret, generateURI, verifySync } from 'otplib';
 import QRCode from 'qrcode';
 
 const SECRET = process.env.JWT_SECRET;
+if (!SECRET) {
+  // Belt-and-suspenders guard — auth.ts middleware already enforces this at startup,
+  // but guard here too so jwt.sign() failures are obvious rather than cryptic.
+  console.error('FATAL: JWT_SECRET is not set. AuthService cannot function.');
+  process.exit(1);
+}
+
 const MAX_FAILED = 5;
 
 export class AuthService {
@@ -85,10 +92,26 @@ export class AuthService {
     await run('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?', [user.id]);
 
     const token = this.signToken(user);
-    const { password_hash, token_version, failed_attempts, locked_until, is_active, two_factor_secret, ...safeUser } = user;
-    
+
+    // Reconstruct the response from an explicit safe allowlist.
+    // Never spread the full DB row — it may include reset_token, two_factor_secret, etc.
+    const safeUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone ?? null,
+      address: user.address ?? null,
+      organization: user.organization ?? null,
+      avatar_url: user.avatar_url ?? null,
+      two_factor_enabled: !!user.two_factor_enabled,
+      meals_saved: user.meals_saved ?? 0,
+      badges: user.badges ?? [],
+      created_at: user.created_at,
+    };
+
     await audit({ actorId: user.id, actorRole: user.role, action: 'login_success', ip });
-    
+
     return { token, user: safeUser };
   }
 

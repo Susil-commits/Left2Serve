@@ -77,8 +77,8 @@ router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'),
     const [existing] = await all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('pending','approved')", [food_listing_id, req.user!.id]);
     if (existing) return res.status(409).json({ error: 'You already have an active reservation for this listing' });
 
-    const amountRupees = Math.round(price * qty * 100) / 100;
     const amountPaise = Math.round(price * qty * 100);
+    const amountRupees = amountPaise / 100; // derive from paise to avoid float drift
 
     let order;
     try { order = await createRazorpayOrder(amountPaise, `l2s_${req.user!.id}_${Date.now()}`); }
@@ -110,8 +110,7 @@ router.post('/create-order', authMiddleware, roleMiddleware('ngo', 'volunteer'),
       prefill: { name: reserver?.name || '', email: reserver?.email || '', contact: reserver?.phone || '' }
     });
   } catch (err) {
-    console.error('create-order error:', err);
-    res.status(500).json({ error: 'Failed to create payment order' });
+    next(err);
   }
 });
 
@@ -140,8 +139,7 @@ router.post('/verify', authMiddleware, roleMiddleware('ngo', 'volunteer'), valid
     const updated = await get('SELECT * FROM reservations WHERE id = ?', [reservation_id]);
     res.json({ success: true, reservation: updated });
   } catch (err) {
-    console.error('verify error:', err);
-    res.status(500).json({ error: 'Payment verification failed' });
+    next(err);
   }
 });
 

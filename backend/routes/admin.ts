@@ -23,7 +23,11 @@ router.post('/login', async (req: Request, res: Response, next) => {
   const { adminCode } = req.body;
   if (!ADMIN_CODE) return res.status(503).json({ error: 'Admin access is not configured' });
   if (!adminCode) return res.status(400).json({ error: 'Admin code is required' });
-  if (adminCode !== ADMIN_CODE) return res.status(401).json({ error: 'Invalid admin code' });
+  // Use timing-safe comparison to prevent timing-attack enumeration of the admin code
+  const provided = Buffer.from(String(adminCode));
+  const expected = Buffer.from(ADMIN_CODE);
+  const isValid = provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+  if (!isValid) return res.status(401).json({ error: 'Invalid admin code' });
   const token = jwt.sign({ id: 0, role: 'admin', tv: 0 }, process.env.JWT_SECRET, { expiresIn: '8h' });
   res.json({ token, user: { id: 0, name: 'Administrator', email: 'admin@left2serve.com', role: 'admin' } });
 });
@@ -59,8 +63,15 @@ router.get('/stats', authMiddleware, roleMiddleware('admin'), cacheMiddleware(60
 
 router.get('/users', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response, next) => {
   try {
-    const users = await all('SELECT id, name, email, role, phone, address, organization, is_active, created_at FROM users ORDER BY created_at DESC LIMIT 500');
-    res.json(users);
+    const page = Math.max(1, parseInt((req.query.page as string)) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string)) || 50));
+    const offset = (page - 1) * limit;
+    const users = await all(
+      'SELECT id, name, email, role, phone, address, organization, is_active, created_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      [limit, offset]
+    );
+    const [countRow] = await all('SELECT COUNT(*) as total FROM users');
+    res.json({ users, pagination: { page, limit, total: countRow.total, totalPages: Math.ceil(countRow.total / limit) } });
   } catch (err) { next(err); }
 });
 
@@ -92,8 +103,15 @@ router.get('/orders', authMiddleware, roleMiddleware('admin'), async (req: Reque
 
 router.get('/listings', authMiddleware, roleMiddleware('admin'), async (req: Request, res: Response, next) => {
   try {
-    const listings = await all(`SELECT fl.*, u.name as donor_name, u.email as donor_email, u.phone as donor_phone, u.organization as donor_org FROM food_listings fl JOIN users u ON fl.user_id = u.id ORDER BY fl.created_at DESC LIMIT 500`);
-    res.json(listings.map(l => ({ ...l, image_urls: l.image_urls || [] })));
+    const page = Math.max(1, parseInt((req.query.page as string)) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string)) || 50));
+    const offset = (page - 1) * limit;
+    const listings = await all(
+      `SELECT fl.*, u.name as donor_name, u.email as donor_email, u.phone as donor_phone, u.organization as donor_org FROM food_listings fl JOIN users u ON fl.user_id = u.id ORDER BY fl.created_at DESC LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
+    const [countRow] = await all('SELECT COUNT(*) as total FROM food_listings');
+    res.json({ listings: listings.map(l => ({ ...l, image_urls: l.image_urls || [] })), pagination: { page, limit, total: countRow.total, totalPages: Math.ceil(countRow.total / limit) } });
   } catch (err) { next(err); }
 });
 
@@ -192,23 +210,22 @@ router.get('/trends', authMiddleware, roleMiddleware('admin'), async (req: Reque
   try {
     const days = Math.min(parseInt((req.query.days as string)) || 14, 90);
     const reservations = await all(
-      `SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date, COUNT(*) as count FROM reservations WHERE created_at >= CURRENT_DATE - INTERVAL '1 day' * ? GROUP BY created_at::date ORDER BY date ASC`,
+      `SELECT TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') as date, COUNT(*) as count FROM reservations WHERE created_at >= NOW() AT TIME ZONE 'UTC' - INTERVAL '1 day' * ? GROUP BY 1 ORDER BY date ASC`,
       [days]
     );
     const meals = await all(
-      `SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date, COALESCE(SUM(quantity), 0) as count FROM reservations WHERE status = 'collected' AND created_at >= CURRENT_DATE - INTERVAL '1 day' * ? GROUP BY created_at::date ORDER BY date ASC`,
+      `SELECT TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') as date, COALESCE(SUM(quantity), 0) as count FROM reservations WHERE status = 'collected' AND created_at >= NOW() AT TIME ZONE 'UTC' - INTERVAL '1 day' * ? GROUP BY 1 ORDER BY date ASC`,
       [days]
     );
     const mealsMap = new Map(meals.map((m) => [String(m.date), Number(m.count)]));
     const resMap = new Map(reservations.map((r) => [String(r.date), Number(r.count)]));
     const pad = (n) => String(n).padStart(2, '0');
-    const localDayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    // Always build keys in UTC to match the DB grouping
     const series = [];
+    const now = new Date();
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() - i);
-      const key = localDayKey(d);
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+      const key = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
       series.push({ date: key, reservations: resMap.get(key) || 0, meals: mealsMap.get(key) || 0 });
     }
     const byCategory = await all(
