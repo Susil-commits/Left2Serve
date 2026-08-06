@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 
-const API_URL = 'https://left2serve.onrender.com/api';
+const API_URL = 'http://localhost:5000/api';
 
 async function register(role) {
   const name = faker.person.fullName();
@@ -69,25 +69,25 @@ async function seed() {
   let usersCreated = 0;
   let listingsCreated = 0;
 
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 5; i++) {
     const donor = await register('donor');
     if (donor) {
       usersCreated++;
       const donorToken = await login(donor.email, donor.rawPassword);
-      // Create 5 listings per donor
-      for (let j = 0; j < 5; j++) {
+      // Create 2 listings per donor
+      for (let j = 0; j < 2; j++) {
         await createListing(donorToken);
         listingsCreated++;
       }
     }
   }
 
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 3; i++) {
     const ngo = await register('ngo');
     if (ngo) usersCreated++;
   }
   
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 2; i++) {
     const volunteer = await register('volunteer');
     if (volunteer) usersCreated++;
   }

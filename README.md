@@ -154,7 +154,7 @@ npm run dev
 
 This repository is pre-configured for seamless zero-config deployment:
 - **Frontend → Vercel**: Import the `frontend` folder into Vercel. Provide `VITE_API_URL` to point to the backend. The included `vercel.json` manages SPA routing.
-- **Backend → Render**: Use the provided `backend/render.yaml` Blueprint. Render will automatically spin up a PostgreSQL instance and the Node.js API, running compilation checks before deployment.
+- **Backend → Render & Supabase**: Use the provided `backend/render.yaml` Blueprint to spin up the Node.js API on Render. The PostgreSQL database is hosted on **Supabase**. You must configure Render's environment variables to point to your Supabase Session Pooler connection details.
 
 ---
 
