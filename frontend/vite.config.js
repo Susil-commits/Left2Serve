@@ -41,6 +41,9 @@ export default defineConfig({
             purpose: 'maskable'
           }
         ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       }
     }),
     visualizer({ filename: 'stats-before.html' })
@@ -48,15 +51,22 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-ui': ['lucide-react', 'recharts', 'framer-motion'],
-          'vendor-maps': ['react-leaflet', 'leaflet']
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/lucide-react') || id.includes('node_modules/recharts') || id.includes('node_modules/framer-motion')) {
+            return 'vendor-ui';
+          }
+          if (id.includes('node_modules/react-leaflet') || id.includes('node_modules/leaflet')) {
+            return 'vendor-maps';
+          }
         }
       }
     }
   },
   server: {
+
     proxy: {
       '/api': 'http://localhost:5000'
     }
