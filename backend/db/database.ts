@@ -1,6 +1,7 @@
 import pg, { Pool, PoolConfig } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 
 // PostgreSQL type parsers
 pg.types.setTypeParser(20, (v: string | null) => (v == null ? null : Number(v))); // int8 / bigint
