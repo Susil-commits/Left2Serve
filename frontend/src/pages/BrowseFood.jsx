@@ -135,21 +135,21 @@ export default function BrowseFood() {
       <div className="flex flex-col sm:flex-row gap-4 mb-6 animate-fade-in-up">
         <div className="relative flex-1">
           <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={t('browse.search_placeholder')} className="input-field pl-14" />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={t('browse.search_placeholder')} className="input-field pl-14 pr-12" />
           {search && (
             <button onClick={clearSearch} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-accent transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           )}
         </div>
-        <select value={distance} onChange={handleDistanceChange} className="input-field select-field !w-auto !py-2 !px-4 !text-sm">
+        <select value={distance} onChange={handleDistanceChange} className="input-field select-field !w-auto !py-2 !pl-4 !pr-10 !text-sm">
           <option value="">Any Distance</option>
           <option value="5">Within 5 km</option>
           <option value="10">Within 10 km</option>
           <option value="25">Within 25 km</option>
           <option value="50">Within 50 km</option>
         </select>
-        <select value={sort} onChange={e => changeSort(e.target.value)} className="input-field select-field !w-auto !py-2 !px-4 !text-sm">
+        <select value={sort} onChange={e => changeSort(e.target.value)} className="input-field select-field !w-auto !py-2 !pl-4 !pr-10 !text-sm">
           <option value="newest">{t('browse.sort_newest')}</option>
           <option value="expiring">{t('browse.sort_expiring')}</option>
           <option value="quantity">Most Quantity</option>

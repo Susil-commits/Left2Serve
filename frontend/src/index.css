@@ -84,6 +84,7 @@ body { background-color: var(--color-surface); color: var(--color-text); overflo
 .animate-glow-pulse { animation: glowPulse 2s ease-in-out infinite; }
 .animate-border-glow { animation: borderGlow 2s ease-in-out infinite; }
 
+@layer components {
 /* Glass — theme-aware */
 .glass {
   background: rgba(255, 255, 255, 0.85);
@@ -320,6 +321,8 @@ body { background-color: var(--color-surface); color: var(--color-text); overflo
   .premium-card-elevated { border-radius: 16px; padding: 1.25rem; }
   .btn-primary, .btn-outline { padding: 0.65rem 1.25rem; font-size: 0.8rem; border-radius: 12px; }
   .input-field { padding: 0.75rem 0.9rem; font-size: 0.85rem; border-radius: 12px; }
+}
+
 }
 
 /* Keyboard focus precision — visible rings only for keyboard users */

@@ -295,7 +295,7 @@ export default function FoodDetail() {
                   <label className="block text-sm font-semibold text-text mb-2">Quantity</label>
                   <div className="relative">
                     <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, Math.min(remaining, parseInt(e.target.value) || 1)))}
-                      min={1} max={remaining} required className="input-field" />
+                      min={1} max={remaining} required className="input-field pr-12" />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">/ {remaining}</span>
                   </div>
                 </div>
