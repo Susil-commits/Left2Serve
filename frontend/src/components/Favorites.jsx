@@ -1,34 +1,35 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
-const FavoritesContext = createContext(null);
-const STORAGE_KEY = 'left2serve_favorites';
+const useFavoritesStore = create(
+  persist(
+    (set, get) => ({
+      ids: [],
+      isFavorite: (id) => get().ids.includes(id),
+      toggle: (id) =>
+        set((state) => ({
+          ids: state.ids.includes(id)
+            ? state.ids.filter((x) => x !== id)
+            : [...state.ids, id],
+        })),
+    }),
+    {
+      name: 'left2serve_favorites',
+    }
+  )
+);
 
-export function FavoritesProvider({ children }) {
-  const [ids, setIds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-    catch { return []; }
-  });
-
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ids)); } catch { /* storage unavailable */ }
-  }, [ids]);
-
-  const isFavorite = useCallback((id) => ids.includes(id), [ids]);
-  const toggle = useCallback((id) => {
-    setIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-  }, []);
-  const count = ids.length;
-
-  return (
-    <FavoritesContext.Provider value={{ ids, isFavorite, toggle, count }}>
-      {children}
-    </FavoritesContext.Provider>
-  );
+export function useFavorites() {
+  const store = useFavoritesStore();
+  return {
+    ids: store.ids,
+    isFavorite: store.isFavorite,
+    toggle: store.toggle,
+    count: store.ids.length,
+  };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
-export function useFavorites() {
-  const ctx = useContext(FavoritesContext);
-  if (!ctx) throw new Error('useFavorites must be used within FavoritesProvider');
-  return ctx;
+// Dummy provider to keep App.jsx happy before we clean it up
+export function FavoritesProvider({ children }) {
+  return children;
 }

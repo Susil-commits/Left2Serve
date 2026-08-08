@@ -32,6 +32,8 @@ const retryOpts = {
   maxDelayMs: 10000,
 };
 
+import { backgroundQueue } from './cron.js';
+
 export function getNotificationHealth() {
   return {
     state: emailCircuitBreaker.getState(),
@@ -40,7 +42,7 @@ export function getNotificationHealth() {
   };
 }
 
-export async function sendEmail(to: string, subject: string, html: string, text?: string) {
+export async function executeEmailSend(to: string, subject: string, html: string, text?: string) {
   const doSend = async () => {
     if (process.env.SENDGRID_API_KEY) {
       await sgMail.send({
@@ -71,8 +73,12 @@ export async function sendEmail(to: string, subject: string, html: string, text?
     await emailCircuitBreaker.execute(() => retryWithBackoff(doSend, retryOpts));
   } catch (err) {
     console.error('Failed to send email to', to, err);
-    throw err; // Allow callers like sendWelcomeEmail to catch or bubble up
+    throw err; 
   }
+}
+
+export async function sendEmail(to: string, subject: string, html: string, text?: string) {
+  await backgroundQueue.add('send-email', { to, subject, html, text });
 }
 
 export async function sendWelcomeEmail(to: string, name: string) {

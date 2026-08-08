@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 import FoodCard from '../components/FoodCard';
 import Pagination from '../components/Pagination';
@@ -24,10 +25,6 @@ const LIMIT = 12;
 export default function BrowseFood() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [listings, setListings] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [category, setCategory] = useState(searchParams.get('category') || '');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
@@ -43,10 +40,9 @@ export default function BrowseFood() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
+  const { data, isLoading: loading, isError, error: queryError, refetch } = useQuery({
+    queryKey: ['listings', { category, search: debouncedSearch, sort, page, distance, location, selectedDietary }],
+    queryFn: async () => {
       const params = {
         category: category || undefined,
         search: debouncedSearch || undefined,
@@ -60,20 +56,16 @@ export default function BrowseFood() {
         params.lng = location.lng;
         if (distance) params.distance = distance;
       }
-      const data = await api.listings.getAll(params);
-      setListings(data.listings);
-      setPagination(data.pagination);
-    } catch (err) {
-      setError(err.message || 'Failed to load listings');
-      setListings([]);
-    }
-    setLoading(false);
-  }, [category, debouncedSearch, sort, page, distance, location, selectedDietary]);
+      return await api.listings.getAll(params);
+    },
+    keepPreviousData: true,
+  });
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData();
-  }, [loadData]);
+  const listings = data?.listings || [];
+  const pagination = data?.pagination || { page: 1, totalPages: 1, total: 0 };
+  const error = isError ? (queryError?.message || 'Failed to load listings') : '';
+
+  const loadData = () => refetch();
 
   const changeCategory = (value) => { setCategory(value); setPage(1); };
   const changeSort = (value) => { setSort(value); setPage(1); };

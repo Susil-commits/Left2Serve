@@ -4,7 +4,6 @@ import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './components/AuthContext';
 import { ToastProvider } from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmDialog';
-import { FavoritesProvider } from './components/Favorites';
 import { ThemeProvider } from './components/ThemeProvider';
 import ErrorBoundary from './components/ErrorBoundary';
 import Navbar from './components/Navbar';
@@ -40,7 +39,6 @@ export default function App() {
           <AuthProvider>
             <ToastProvider>
               <ConfirmProvider>
-                <FavoritesProvider>
                   <ErrorBoundary>
                     <PushNotificationManager />
                     <div className="min-h-screen bg-surface text-text flex flex-col">
@@ -72,7 +70,6 @@ export default function App() {
                       <Footer />
                     </div>
                   </ErrorBoundary>
-                </FavoritesProvider>
               </ConfirmProvider>
             </ToastProvider>
           </AuthProvider>

@@ -1,4 +1,6 @@
-import pg, { Pool } from 'pg';
+import pg from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '@prisma/client';
 // PostgreSQL type parsers
 pg.types.setTypeParser(20, (v) => (v == null ? null : Number(v))); // int8 / bigint
 pg.types.setTypeParser(1700, (v) => (v == null ? null : Number(v))); // numeric / decimal
@@ -71,11 +73,14 @@ function buildConfig() {
         cfg.ssl = { rejectUnauthorized: false };
     return cfg;
 }
+// Synchronously initialize the pool for Prisma 7 adapter
+const pgPool = new pg.Pool({ ...buildConfig(), max: parseInt(process.env.DB_POOL_MAX || '10') });
+const adapter = new PrismaPg(pgPool);
+export const prisma = new PrismaClient({ adapter });
 async function getPool() {
     if (pool)
         return pool;
-    const cfg = buildConfig();
-    pool = new Pool({ ...cfg, max: parseInt(process.env.DB_POOL_MAX || '10') });
+    pool = pgPool;
     // Initial connection check
     const client = await pool.connect();
     client.release();

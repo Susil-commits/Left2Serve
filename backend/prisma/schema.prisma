@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                 Int              @id @default(autoincrement())
+  name               String           @db.VarChar(255)
+  email              String           @unique @db.VarChar(255)
+  password_hash      String           @db.VarChar(255)
+  role               String           @db.VarChar(20)
+  phone              String?          @db.VarChar(20)
+  address            String?
+  organization       String?          @db.VarChar(255)
+  is_active          Boolean?         @default(true)
+  token_version      Int              @default(0)
+  failed_attempts    Int              @default(0)
+  locked_until       DateTime?        @db.Timestamp()
+  created_at         DateTime?        @default(now()) @db.Timestamp()
+  reset_token        String?          @db.VarChar(255)
+  reset_expires      DateTime?        @db.Timestamp()
+  two_factor_secret  String?          @db.VarChar(255)
+  two_factor_enabled Boolean?         @default(false)
+  avatar_url         String?          @db.VarChar(255)
+  badges             Json?            @default("[]")
+  meals_saved        Int?             @default(0)
+  push_subscriptions Json?            @default("[]")
+
+  food_listings      FoodListing[]
+  reservations       Reservation[]
+  notifications      Notification[]
+  reviews_given      Review[]         @relation("Reviewer")
+  reviews_received   Review[]         @relation("Reviewee")
+  messages           Message[]
+  watchlists         Watchlist[]
+  forum_posts        ForumPost[]
+  forum_replies      ForumReply[]
+}
+
+model FoodListing {
+  id                   Int           @id @default(autoincrement())
+  user_id              Int
+  title                String        @db.VarChar(255)
+  description          String?
+  category             String        @db.VarChar(20)
+  quantity             Int
+  unit                 String        @default("servings") @db.VarChar(50)
+  price                Decimal?      @default(0) @db.Decimal(10, 2)
+  expiry_date          DateTime      @db.Timestamp()
+  pickup_address       String
+  pickup_instructions  String?
+  image_urls           Json?         @default("[]")
+  dietary_preferences  Json?         @default("[]")
+  status               String?       @default("available") @db.VarChar(20)
+  created_at           DateTime?     @default(now()) @db.Timestamp()
+  latitude             Decimal?      @db.Decimal(10, 7)
+  longitude            Decimal?      @db.Decimal(10, 7)
+  has_safety_checklist Boolean?      @default(false)
+  is_template          Boolean?      @default(false)
+
+  user                 User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  reservations         Reservation[]
+  reviews              Review[]
+}
+
+model Reservation {
+  id                   Int       @id @default(autoincrement())
+  food_listing_id      Int
+  user_id              Int
+  quantity             Int
+  status               String?   @default("pending") @db.VarChar(20)
+  payment_method       String    @default("none") @db.VarChar(20)
+  payment_status       String    @default("pending") @db.VarChar(20)
+  amount               Decimal   @default(0) @db.Decimal(10, 2)
+  razorpay_order_id    String?   @db.VarChar(255)
+  razorpay_payment_id  String?   @db.VarChar(255)
+  razorpay_signature   String?   @db.VarChar(255)
+  pickup_time          DateTime? @db.Timestamp()
+  notes                String?
+  created_at           DateTime? @default(now()) @db.Timestamp()
+  agreed_to_waiver     Boolean?  @default(false)
+
+  food_listing         FoodListing @relation(fields: [food_listing_id], references: [id], onDelete: Cascade)
+  user                 User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  reviews              Review[]
+  messages             Message[]
+}
+
+model Notification {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  type       String    @db.VarChar(50)
+  title      String    @db.VarChar(255)
+  message    String
+  data       Json?     @default("{}")
+  is_read    Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamp()
+
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id          Int       @id @default(autoincrement())
+  actor_id    Int?
+  actor_role  String?   @db.VarChar(20)
+  action      String    @db.VarChar(50)
+  target_type String?   @db.VarChar(30)
+  target_id   Int?
+  detail      String?
+  ip          String?   @db.VarChar(45)
+  created_at  DateTime? @default(now()) @db.Timestamp()
+}
+
+model Review {
+  id             Int       @id @default(autoincrement())
+  reservation_id Int
+  listing_id     Int
+  reviewer_id    Int
+  reviewee_id    Int
+  rating         Int       @db.SmallInt
+  comment        String?   @db.VarChar(500)
+  created_at     DateTime? @default(now()) @db.Timestamp()
+
+  reservation    Reservation @relation(fields: [reservation_id], references: [id], onDelete: Cascade)
+  food_listing   FoodListing @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+  reviewer       User        @relation("Reviewer", fields: [reviewer_id], references: [id], onDelete: Cascade)
+  reviewee       User        @relation("Reviewee", fields: [reviewee_id], references: [id], onDelete: Cascade)
+
+  @@unique([reservation_id, reviewer_id])
+}
+
+model Message {
+  id             Int       @id @default(autoincrement())
+  reservation_id Int
+  sender_id      Int
+  content        String
+  created_at     DateTime? @default(now()) @db.Timestamp()
+
+  reservation    Reservation @relation(fields: [reservation_id], references: [id], onDelete: Cascade)
+  sender         User        @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+}
+
+model Watchlist {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  keyword    String?   @db.VarChar(255)
+  latitude   Decimal   @db.Decimal(10, 7)
+  longitude  Decimal   @db.Decimal(10, 7)
+  radius_km  Decimal   @default(10) @db.Decimal(5, 2)
+  created_at DateTime? @default(now()) @db.Timestamp()
+
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model ForumCategory {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(255)
+  description String?
+  read_roles  Json      @default("[\"admin\",\"donor\",\"ngo\",\"volunteer\"]")
+  write_roles Json      @default("[\"admin\",\"donor\",\"ngo\",\"volunteer\"]")
+  created_at  DateTime? @default(now()) @db.Timestamp()
+
+  forum_posts ForumPost[]
+}
+
+model ForumPost {
+  id          Int       @id @default(autoincrement())
+  category_id Int
+  user_id     Int
+  title       String    @db.VarChar(255)
+  content     String
+  created_at  DateTime? @default(now()) @db.Timestamp()
+
+  category    ForumCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  replies     ForumReply[]
+}
+
+model ForumReply {
+  id         Int       @id @default(autoincrement())
+  post_id    Int
+  user_id    Int
+  content    String
+  created_at DateTime? @default(now()) @db.Timestamp()
+
+  post       ForumPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}

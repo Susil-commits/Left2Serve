@@ -25,6 +25,7 @@ const retryOpts = {
     baseDelayMs: Number(process.env.NOTIFY_RETRY_BASE_DELAY_MS) || 1000,
     maxDelayMs: 10000,
 };
+import { backgroundQueue } from './cron.js';
 export function getNotificationHealth() {
     return {
         state: emailCircuitBreaker.getState(),
@@ -32,7 +33,7 @@ export function getNotificationHealth() {
         lastStateChange: emailCircuitBreaker.getLastStateChange(),
     };
 }
-export async function sendEmail(to, subject, html, text) {
+export async function executeEmailSend(to, subject, html, text) {
     const doSend = async () => {
         if (process.env.SENDGRID_API_KEY) {
             await sgMail.send({
@@ -61,8 +62,11 @@ export async function sendEmail(to, subject, html, text) {
     }
     catch (err) {
         console.error('Failed to send email to', to, err);
-        throw err; // Allow callers like sendWelcomeEmail to catch or bubble up
+        throw err;
     }
+}
+export async function sendEmail(to, subject, html, text) {
+    await backgroundQueue.add('send-email', { to, subject, html, text });
 }
 export async function sendWelcomeEmail(to, name) {
     const subject = 'Welcome to Left2Serve!';

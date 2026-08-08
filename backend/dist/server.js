@@ -1,4 +1,14 @@
 import 'dotenv/config';
+import * as Sentry from '@sentry/node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
+Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    integrations: [
+        nodeProfilingIntegration(),
+    ],
+    tracesSampleRate: 1.0,
+    profilesSampleRate: 1.0,
+});
 import 'express-async-errors';
 import express from 'express';
 import http from 'http';
@@ -12,7 +22,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import initializeDb from './db/init.js';
 import { sweepExpiredListings } from './db/expire.js';
-import { setupCronJobs } from './utils/cron.js';
+import { setupBackgroundJobs } from './utils/cron.js';
 import authRoutes from './routes/auth.js';
 import listingRoutes from './routes/listings.js';
 import reservationRoutes from './routes/reservations.js';
@@ -25,6 +35,9 @@ import watchlistsRoutes from './routes/watchlists.js';
 import forumRoutes from './routes/forum.js';
 import aiRoutes from './routes/ai.js';
 import { getNotificationHealth } from './utils/email.js';
+import * as trpcExpress from '@trpc/server/adapters/express';
+import { appRouter } from './routers/_app.js';
+import { createContext } from './trpc.js';
 import { v4 as uuidv4 } from 'uuid';
 import { xssClean } from './middleware/xss.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -101,7 +114,13 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/health/notifications', (req, res) => {
     res.json(getNotificationHealth());
 });
+// Mount tRPC router
+app.use('/trpc', trpcExpress.createExpressMiddleware({
+    router: appRouter,
+    createContext,
+}));
 app.use((req, res) => { res.status(404).json({ error: 'Not found' }); });
+Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler);
 export const io = new SocketIOServer(server, {
     cors: {
@@ -119,7 +138,7 @@ setupSocketHandlers(io);
 const PORT = process.env.PORT || 5000;
 initializeDb().then(async () => {
     await sweepExpiredListings();
-    setupCronJobs();
+    await setupBackgroundJobs();
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }).catch((err) => {
     console.error('FATAL: Failed to start server:\n' + (err.message || err));
