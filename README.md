@@ -21,6 +21,7 @@ Left2Serve has been iteratively built to provide a robust, enterprise-grade expe
 - **Smart Matching Engine** — NGOs and Volunteers can create Watchlists. They are notified automatically when a new listing matches their dietary or category preferences.
 - **Web Push Notifications** — Native browser notifications for real-time matches and reservation updates, running seamlessly alongside in-app toasts.
 - **In-App Notifications** — Notification bell with unread badges tracking the reservation lifecycle events.
+- **Resilient Notification Delivery** — Enterprise-grade asynchronous notification dispatch featuring exponential backoff with full jitter and a Circuit Breaker pattern to safely handle downstream provider outages without compounding latency. Includes a dedicated `/api/health/notifications` observability endpoint.
 
 ### 🏆 Gamification & Impact
 - **Impact Badges** — Donors earn tier-based badges (Bronze, Silver, Gold, Platinum, Eco Hero) as they save more meals, displayed on their profile and dashboard.

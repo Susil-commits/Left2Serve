@@ -13,8 +13,27 @@ const transporter = nodemailer.createTransport({
         pass: process.env.SMTP_PASS || '',
     },
 });
+import { CircuitBreaker } from './circuitBreaker.js';
+import { retryWithBackoff } from './retry.js';
+const emailCircuitBreaker = new CircuitBreaker({
+    failureThreshold: Number(process.env.NOTIFY_CIRCUIT_FAILURE_THRESHOLD) || 5,
+    cooldownMs: Number(process.env.NOTIFY_CIRCUIT_COOLDOWN_MS) || 60000,
+    halfOpenMaxAttempts: 1,
+});
+const retryOpts = {
+    retries: Number(process.env.NOTIFY_RETRY_MAX_ATTEMPTS) || 3,
+    baseDelayMs: Number(process.env.NOTIFY_RETRY_BASE_DELAY_MS) || 1000,
+    maxDelayMs: 10000,
+};
+export function getNotificationHealth() {
+    return {
+        state: emailCircuitBreaker.getState(),
+        consecutiveFailures: emailCircuitBreaker.getConsecutiveFailures(),
+        lastStateChange: emailCircuitBreaker.getLastStateChange(),
+    };
+}
 export async function sendEmail(to, subject, html, text) {
-    try {
+    const doSend = async () => {
         if (process.env.SENDGRID_API_KEY) {
             await sgMail.send({
                 to,
@@ -36,9 +55,13 @@ export async function sendEmail(to, subject, html, text) {
             text: text || html.replace(/<[^>]+>/g, ''),
             html,
         });
+    };
+    try {
+        await emailCircuitBreaker.execute(() => retryWithBackoff(doSend, retryOpts));
     }
     catch (err) {
         console.error('Failed to send email to', to, err);
+        throw err; // Allow callers like sendWelcomeEmail to catch or bubble up
     }
 }
 export async function sendWelcomeEmail(to, name) {

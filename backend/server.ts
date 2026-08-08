@@ -26,6 +26,7 @@ import chatRoutes from './routes/chat.js';
 import watchlistsRoutes from './routes/watchlists.js';
 import forumRoutes from './routes/forum.js';
 import aiRoutes from './routes/ai.js';
+import { getNotificationHealth } from './utils/email.js';
 import { v4 as uuidv4 } from 'uuid';
 import { xssClean } from './middleware/xss.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -107,6 +108,9 @@ app.use('/api/watchlists', watchlistsRoutes);
 app.use('/api/forum', forumRoutes);
 app.use('/api/ai', aiRoutes);
 app.get('/api/health', (req: Request, res: Response) => res.json({ status: 'ok' }));
+app.get('/api/health/notifications', (req: Request, res: Response) => {
+  res.json(getNotificationHealth());
+});
 
 app.use((req: Request, res: Response) => { res.status(404).json({ error: 'Not found' }) });
 
