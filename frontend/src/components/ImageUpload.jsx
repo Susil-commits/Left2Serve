@@ -26,7 +26,7 @@ export default function ImageUpload({ onUpload, images = [], onRemove }) {
     if (!sized.length) return;
     setUploading(true);
     
-    // Generate local previews
+    // Local preview generation
     const localPreviews = sized.map(f => URL.createObjectURL(f));
     setPreviews(localPreviews);
 
@@ -40,7 +40,7 @@ export default function ImageUpload({ onUpload, images = [], onRemove }) {
       addToast(err.message || 'Upload failed', 'error');
     } finally {
       setUploading(false);
-      // Revoke blob URLs to avoid memory leaks
+      // Cleanup blob URLs
       localPreviews.forEach(p => URL.revokeObjectURL(p));
       setPreviews([]);
       if (fileInputRef.current) fileInputRef.current.value = '';

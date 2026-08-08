@@ -45,7 +45,7 @@ export function setupSocketHandlers(io: SocketIOServer) {
     socket.on('send_message', async (data) => {
       const { reservationId, content } = data;
       if (!content || !reservationId) return;
-      // Clamp message length to prevent oversized payloads
+      // Message length boundary clamp
       const safeContent = String(content).slice(0, 2000);
       const rId = Number(reservationId);
       if (!Number.isInteger(rId) || rId <= 0) {

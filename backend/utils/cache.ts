@@ -12,7 +12,7 @@ export const cacheMiddleware = (durationSecs: number) => {
       return next();
     }
 
-    // Include role in cache key to prevent leaking higher-privilege data to lower-privilege users
+    // Role-based cache isolation
     const roleKey = (req as any).user?.role ? `_${(req as any).user.role}` : '';
     const key = `__express__${req.originalUrl || req.url}${roleKey}`;
     const cachedResponse = cache.get(key);
@@ -25,7 +25,7 @@ export const cacheMiddleware = (durationSecs: number) => {
 
     res.setHeader('X-Cache', 'MISS');
     
-    // Override res.json and res.send to intercept the response
+    // Response interceptor
     const originalSend = res.send.bind(res);
     res.send = (body) => {
       // Only cache successful responses

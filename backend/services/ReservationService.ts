@@ -10,11 +10,9 @@ export class ReservationService {
     const { food_listing_id, quantity, pickup_time, notes, payment_method } = payload;
     const qty = Number(quantity);
 
-    // Wrap in a transaction so SELECT FOR UPDATE actually holds a row-level lock
-    // and prevents two simultaneous requests from both passing the availability check.
+    // Row-level lock transaction
     return await withTransaction(async (tx) => {
-      // Lock the listing row first to prevent concurrent reservations from overbooking.
-      // SELECT FOR UPDATE serializes all reservation attempts for the same listing.
+      // Concurrency lock
       const listing = await tx.get('SELECT * FROM food_listings WHERE id = ? FOR UPDATE', [food_listing_id]);
       if (!listing) throw new AppError(404, 'Listing not found');
       if (listing.status !== 'available') throw new AppError(400, 'Listing is no longer available');
@@ -46,8 +44,7 @@ export class ReservationService {
       const reservation = await tx.get('SELECT * FROM reservations WHERE id = ?', [id]);
       const reserver = await tx.get('SELECT name FROM users WHERE id = ?', [userId]);
 
-      // createNotification is fire-and-forget — fine to run after the transaction commits
-      // but we schedule it inside to keep all business logic together.
+      // Fire-and-forget notification
       await createNotification(
         listing.user_id,
         'reservation_new',
@@ -113,8 +110,7 @@ export class ReservationService {
 
     if (!isOwner && !isReserver) throw new AppError(403, 'Not authorized');
 
-    // Only listing owners (donors) can approve or mark collected.
-    // Reservers can only cancel their own reservation.
+    // Authorization rules
     const allowed = new Set<string>();
     if (isOwner) { allowed.add('approved'); allowed.add('collected'); }
     if (isReserver) { allowed.add('cancelled'); }

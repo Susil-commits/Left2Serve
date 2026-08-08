@@ -28,7 +28,7 @@ export class ListingService {
     if (lat && lng && distance) {
       const radius = Number(distance);
       if (!isNaN(Number(lat)) && !isNaN(Number(lng)) && !isNaN(radius)) {
-        // Fast bounding box pre-filter
+        // Bounding box pre-filter
         const latDelta = radius / 111.045;
         const lngDelta = radius / (111.045 * Math.cos(Number(lat) * (Math.PI / 180)));
         const minLat = Number(lat) - latDelta;
@@ -107,7 +107,7 @@ export class ListingService {
     
     const listing = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [id]);
     
-    // Trigger Smart Alerts if it's not a template
+    // Smart Alert trigger
     if (lat !== null && lng !== null && !is_template) {
       const searchStr = `${title} ${description || ''} ${category}`;
       const watchers = await all(`
@@ -138,5 +138,134 @@ export class ListingService {
     }
 
     return finalListing;
+  }
+  static async getAnalyticsMe(userId: number) {
+    const monthlyStats = await all(`
+      SELECT 
+        TO_CHAR(r.updated_at, 'YYYY-MM') as month,
+        SUM(r.quantity) as meals_saved
+      FROM reservations r
+      JOIN food_listings fl ON r.food_listing_id = fl.id
+      WHERE fl.user_id = ? AND r.status = 'collected'
+      GROUP BY TO_CHAR(r.updated_at, 'YYYY-MM')
+      ORDER BY month ASC
+    `, [userId]);
+
+    const [totalListings] = await all('SELECT COUNT(*) as count FROM food_listings WHERE user_id = ?', [userId]);
+    const [totalDonated] = await all("SELECT COALESCE(SUM(r.quantity), 0) as count FROM reservations r JOIN food_listings fl ON r.food_listing_id = fl.id WHERE fl.user_id = ? AND r.status = 'collected'", [userId]);
+    
+    return {
+      monthlyStats,
+      totalListings: totalListings?.count || 0,
+      totalDonated: totalDonated?.count || 0
+    };
+  }
+
+  static async getMine(userId: number) {
+    const listings = await all(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.user_id = ? AND fl.is_template = false ORDER BY fl.created_at DESC`, [userId]);
+    return listings.map(l => this.withRemaining(l));
+  }
+
+  static async getTemplates(userId: number) {
+    return await all(`SELECT * FROM food_listings WHERE user_id = ? AND is_template = true ORDER BY created_at DESC`, [userId]);
+  }
+
+  static async getStats() {
+    const [listingsRow] = await all("SELECT COUNT(*) as count FROM food_listings WHERE status = 'available'");
+    const [donorsRow] = await all("SELECT COUNT(*) as count FROM users WHERE role = 'donor'");
+    const [receiversRow] = await all("SELECT COUNT(*) as count FROM users WHERE role IN ('ngo','volunteer')");
+    const [mealsRow] = await all("SELECT COALESCE(SUM(quantity), 0) as total FROM reservations WHERE status = 'collected'");
+    return {
+      activeListings: listingsRow.count,
+      totalDonors: donorsRow.count,
+      totalReceivers: receiversRow.count,
+      mealsSaved: mealsRow.total,
+    };
+  }
+
+  static async getImpactStats() {
+    const [mealsRow] = await all("SELECT COALESCE(SUM(quantity), 0) as total FROM reservations WHERE status = 'collected'");
+    const [listingsRow] = await all('SELECT COUNT(*) as count FROM food_listings');
+    const [donorsRow] = await all("SELECT COUNT(*) as count FROM users WHERE role = 'donor'");
+    const [receiversRow] = await all("SELECT COUNT(*) as count FROM users WHERE role IN ('ngo','volunteer')");
+    const meals = Number(mealsRow.total) || 0;
+    const co2Kg = Math.round(meals * 2.5);
+    return {
+      mealsSaved: meals,
+      co2Kg,
+      trees: Math.round((co2Kg / 21) * 10) / 10,
+      waterLiters: meals * 1250,
+      totalListings: listingsRow.count,
+      totalDonors: donorsRow.count,
+      totalReceivers: receiversRow.count,
+    };
+  }
+
+  static async getOne(id: number | string, user?: { id: number, role: string }) {
+    const listing = await get(`SELECT fl.*, u.name as donor_name, u.organization as donor_org, u.phone as donor_phone, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl JOIN users u ON fl.user_id = u.id WHERE fl.id = ?`, [id]);
+    if (!listing) return null;
+    const out = this.withRemaining(listing);
+    const isOwner = user && user.id === listing.user_id;
+    const isAdmin = user && user.role === 'admin';
+    let canSeeDonorContact = isOwner || isAdmin;
+    if (!canSeeDonorContact && user && (user.role === 'ngo' || user.role === 'volunteer')) {
+      const [r] = await all("SELECT id FROM reservations WHERE food_listing_id = ? AND user_id = ? AND status IN ('approved','collected')", [listing.id, user.id]);
+      if (r) canSeeDonorContact = true;
+    }
+    if (!canSeeDonorContact) delete out.donor_phone;
+    return out;
+  }
+
+  static async updateListing(id: number | string, userId: number, data: any) {
+    const listing = await get('SELECT * FROM food_listings WHERE id = ?', [id]);
+    if (!listing) throw new Error('NOT_FOUND');
+    if (listing.user_id !== userId) throw new Error('NOT_AUTHORIZED');
+    if (['expired', 'collected', 'cancelled'].includes(listing.status)) {
+      throw new Error('CLOSED');
+    }
+    const { title, description, category, quantity, unit, price, expiry_date, pickup_address, pickup_instructions, image_urls, dietary_preferences, status, latitude, longitude } = data;
+    const nextCategory = category || listing.category;
+    const nextQty = quantity != null ? Number(quantity) : listing.quantity;
+    const nextExpiry = expiry_date || listing.expiry_date;
+    const existingImageUrls: unknown[] = (() => {
+      if (Array.isArray(listing.image_urls)) return listing.image_urls;
+      try { return JSON.parse(listing.image_urls); } catch { return []; }
+    })();
+    const images = image_urls !== undefined ? image_urls : existingImageUrls;
+    const dietaryTags = dietary_preferences !== undefined ? (Array.isArray(dietary_preferences) ? dietary_preferences : []) : listing.dietary_preferences;
+    const lat = latitude !== undefined ? (latitude ? Number(latitude) : null) : listing.latitude;
+    const lng = longitude !== undefined ? (longitude ? Number(longitude) : null) : listing.longitude;
+    
+    // Dynamic DB import
+    const { run } = await import('../db/database.js');
+    const { recomputeListingStatus } = await import('../db/availability.js');
+    
+    await run(`UPDATE food_listings SET title=?, description=?, category=?, quantity=?, unit=?, price=?, expiry_date=?, pickup_address=?, pickup_instructions=?, image_urls=?, dietary_preferences=?, status=?, latitude=?, longitude=? WHERE id=?`, [title ? String(title).trim() : listing.title, description ?? listing.description, nextCategory, nextQty, unit || listing.unit, price ?? listing.price, nextExpiry, pickup_address ? String(pickup_address).trim() : listing.pickup_address, pickup_instructions ?? listing.pickup_instructions, JSON.stringify(images), JSON.stringify(dietaryTags), status || listing.status, lat, lng, id]);
+    await recomputeListingStatus(id as string);
+    const updated = await get(`SELECT fl.*, GREATEST(${REMAINING_SQL}, 0) AS remaining FROM food_listings fl WHERE fl.id = ?`, [id]);
+    return this.withRemaining(updated);
+  }
+
+  static async deleteListing(id: number | string, userId: number) {
+    const listing = await get('SELECT * FROM food_listings WHERE id = ?', [id]);
+    if (!listing) throw new Error('NOT_FOUND');
+    if (listing.user_id !== userId) throw new Error('NOT_AUTHORIZED');
+    const [active] = await all("SELECT COUNT(*) as count FROM reservations WHERE food_listing_id = ? AND status IN ('pending','approved')", [id]);
+    if (active.count > 0) throw new Error('ACTIVE_RESERVATIONS');
+    
+    const { run } = await import('../db/database.js');
+    await run('DELETE FROM food_listings WHERE id = ?', [id]);
+  }
+
+  static async closeListing(id: number | string, userId: number) {
+    const listing = await get('SELECT * FROM food_listings WHERE id = ?', [id]);
+    if (!listing) throw new Error('NOT_FOUND');
+    if (listing.user_id !== userId) throw new Error('NOT_AUTHORIZED');
+    if (['collected', 'expired', 'cancelled'].includes(listing.status)) throw new Error('ALREADY_CLOSED');
+    const [active] = await all("SELECT COUNT(*) as count FROM reservations WHERE food_listing_id = ? AND status IN ('pending','approved')", [id]);
+    if (active.count > 0) throw new Error('ACTIVE_RESERVATIONS');
+    
+    const { run } = await import('../db/database.js');
+    await run("UPDATE food_listings SET status = 'collected' WHERE id = ?", [id]);
   }
 }

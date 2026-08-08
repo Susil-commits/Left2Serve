@@ -74,7 +74,7 @@ async function seed() {
     if (donor) {
       usersCreated++;
       const donorToken = await login(donor.email, donor.rawPassword);
-      // Create 2 listings per donor
+      // Listing seed payload
       for (let j = 0; j < 2; j++) {
         await createListing(donorToken);
         listingsCreated++;

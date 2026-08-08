@@ -2,9 +2,7 @@ import { all, query } from './database.js';
 
 export async function sweepExpiredListings(): Promise<number> {
   try {
-    // Atomic single-query approach: UPDATE ... RETURNING eliminates the
-    // SELECT → UPDATE TOCTOU window. Any row that expires between the two
-    // queries in the old approach was silently missed.
+    // Atomic status update
     const rows = await query<{ id: number }>(
       "UPDATE food_listings SET status = 'expired' WHERE status = 'available' AND expiry_date < NOW() RETURNING id"
     );

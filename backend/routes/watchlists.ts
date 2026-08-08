@@ -1,21 +1,16 @@
-import { Router, Request, Response } from 'express';
-import { get, all, insert, run } from '../db/database.js';
+import { Router } from 'express';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 import { validateIdParam } from '../middleware/validateParam.js';
 import { z } from 'zod';
 import { validate } from '../middleware/validate.js';
+import { WatchlistController } from '../controllers/WatchlistController.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 router.use(roleMiddleware('ngo', 'volunteer'));
 
-router.get('/', async (req: Request, res: Response, next): Promise<any> => {
-  try {
-    const lists = await all('SELECT * FROM watchlists WHERE user_id = ? ORDER BY created_at DESC', [req.user!.id]);
-    res.json(lists);
-  } catch (err) { next(err); }
-});
+router.get('/', WatchlistController.getUserWatchlists);
 
 const watchlistSchema = z.object({
   keyword: z.string().optional().nullable(),
@@ -24,26 +19,7 @@ const watchlistSchema = z.object({
   radius_km: z.preprocess((val) => Number(val) || 10, z.number().positive())
 });
 
-router.post('/', validate(watchlistSchema), async (req: Request, res: Response, next): Promise<any> => {
-  const { keyword, latitude, longitude, radius_km } = req.body;
-  try {
-    const id = await insert(
-      'INSERT INTO watchlists (user_id, keyword, latitude, longitude, radius_km) VALUES (?, ?, ?, ?, ?)',
-      [req.user!.id, keyword ? String(keyword).trim() : null, Number(latitude), Number(longitude), Number(radius_km) || 10]
-    );
-    const w = await get('SELECT * FROM watchlists WHERE id = ?', [id]);
-    res.status(201).json(w);
-  } catch (err) { next(err); }
-});
-
-router.delete('/:id', validateIdParam('id'), async (req: Request, res: Response, next): Promise<any> => {
-  const item = await get('SELECT * FROM watchlists WHERE id = ?', [req.params.id]);
-  if (!item) return res.status(404).json({ error: 'Not found' });
-  if (item.user_id !== req.user!.id) return res.status(403).json({ error: 'Not authorized' });
-  try {
-    await run('DELETE FROM watchlists WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Deleted successfully' });
-  } catch (err) { next(err); }
-});
+router.post('/', validate(watchlistSchema), WatchlistController.createWatchlist);
+router.delete('/:id', validateIdParam('id'), WatchlistController.deleteWatchlist);
 
 export default router;

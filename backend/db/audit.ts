@@ -17,6 +17,6 @@ export async function audit({ actorId, actorRole, action, targetType, targetId, 
       [actorId ?? null, actorRole ?? null, action, targetType ?? null, targetId ?? null, detail ?? null, ip ?? null]
     );
   } catch {
-    // audit logging must never break the calling flow
+    // Audit failure fallback
   }
 }

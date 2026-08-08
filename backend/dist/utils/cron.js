@@ -1,18 +1,40 @@
 import cron from 'node-cron';
 import { sweepExpiredListings } from '../db/expire.js';
+import { run } from '../db/database.js';
+import { logger } from './logger.js';
 export function setupCronJobs() {
-    // Run every 5 minutes
+    // Expire stale listings interval
     cron.schedule('*/5 * * * *', async () => {
         try {
-            await sweepExpiredListings();
+            const count = await sweepExpiredListings();
+            if (count > 0)
+                logger.info(`Cron: Expired ${count} listing(s)`);
         }
         catch (err) {
-            console.error('Cron: Failed to sweep expired listings', err);
+            logger.error('Cron: Failed to sweep expired listings', err);
         }
     });
-    // Example of a daily task at midnight (could be used for cleanup or reports)
+    // Daily maintenance interval
     cron.schedule('0 0 * * *', async () => {
-        console.log('Cron: Running daily maintenance tasks...');
-        // Add additional daily tasks here
+        logger.info('Cron: Running daily maintenance...');
+        try {
+            await run("DELETE FROM notifications WHERE is_read = TRUE AND created_at < NOW() - INTERVAL '30 days'");
+            logger.info('Cron: Old read notifications purged');
+        }
+        catch (err) {
+            logger.error('Cron: Failed to purge old notifications', err);
+        }
+        try {
+            await run(`UPDATE reservations
+           SET status = 'cancelled'
+         WHERE status IN ('pending', 'approved')
+           AND food_listing_id IN (
+             SELECT id FROM food_listings WHERE status = 'expired'
+           )`);
+            logger.info('Cron: Orphaned reservations auto-cancelled');
+        }
+        catch (err) {
+            logger.error('Cron: Failed to cancel orphaned reservations', err);
+        }
     });
 }

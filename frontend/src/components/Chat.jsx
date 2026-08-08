@@ -11,7 +11,7 @@ export default function Chat({ reservationId, onClose }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    // Fetch initial messages
+    // Initial history load
     api.chat.getHistory(reservationId).then(setMessages).catch(console.error);
 
     const token = localStorage.getItem('token');

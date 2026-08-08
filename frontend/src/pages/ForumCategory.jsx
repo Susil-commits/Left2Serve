@@ -26,7 +26,7 @@ export default function ForumCategory() {
     try {
       setLoading(true);
       const res = await api.forum.getCategoryPosts(categoryId);
-      if (!isMounted) return; // component unmounted while fetching — discard result
+      if (!isMounted) return; // Component unmount check
       setData(res);
     } catch (err) {
       if (!isMounted) return;
@@ -45,7 +45,7 @@ export default function ForumCategory() {
       setNewTitle('');
       setNewContent('');
       setShowNewPost(false);
-      await loadPosts(); // await so errors surface and spinner shows correctly
+      await loadPosts(); // Await for error surface
     } catch (err) {
       alert(err.message || 'Failed to create post');
     } finally {

@@ -11,7 +11,7 @@ export const errorHandler = (err, req, res, next) => {
     else {
         logger.warn(err.message, { stack: err.stack, reqId });
     }
-    // Formatting for Express-specific body parsing errors
+    // Express parsing error overrides
     if (err?.type === 'entity.parse.failed' || err?.type === 'entity.too.large') {
         return res.status(400).json({ error: 'Invalid or too large request body' });
     }
@@ -24,7 +24,7 @@ export const errorHandler = (err, req, res, next) => {
             error: err.message,
         });
     }
-    // Handle PostgreSQL specific errors securely
+    // Database error translation
     if (err?.code) {
         switch (err.code) {
             case '23505': // unique_violation
@@ -37,7 +37,7 @@ export const errorHandler = (err, req, res, next) => {
                 return res.status(400).json({ error: 'Missing required field.' });
         }
     }
-    // Unhandled / Programming Errors
+    // Fallback error handler
     const isProduction = process.env.NODE_ENV === 'production';
     return res.status(statusCode).json({
         error: isProduction ? 'Internal Server Error' : err.message,

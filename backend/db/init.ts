@@ -143,7 +143,7 @@ async function initialize() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Seed forum categories
+  // Forum categories seed
   const catCount = await query('SELECT COUNT(*) AS cnt FROM forum_categories', []);
   if (Number(catCount[0].cnt) === 0) {
     const categories = [
@@ -157,7 +157,7 @@ async function initialize() {
     }
   }
 
-  // migrations for older schemas
+  // Legacy schema migrations
   await addColumnIfMissing('users', 'is_active', 'is_active BOOLEAN DEFAULT TRUE');
   await addColumnIfMissing('users', 'token_version', 'token_version INT NOT NULL DEFAULT 0');
   await addColumnIfMissing('users', 'failed_attempts', 'failed_attempts INT NOT NULL DEFAULT 0');

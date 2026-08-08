@@ -1,5 +1,4 @@
-// Build the API base. Accepts VITE_API_URL with or without a trailing "/api".
-// e.g. "https://x.onrender.com" and "https://x.onrender.com/api" both resolve correctly.
+// API Base Configuration
 function resolveApiBase() {
   const raw = (import.meta.env.VITE_API_URL || '').trim();
   if (!raw) return '/api';
@@ -60,6 +59,7 @@ export const api = {
     delete: (id) => request(`/listings/${id}`, { method: 'DELETE' }),
     close: (id) => request(`/listings/${id}/close`, { method: 'POST' }),
     upload: (formData) => request('/listings/upload', { method: 'POST', body: formData }),
+    analyzeImage: (body) => request('/listings/analyze-image', { method: 'POST', body }),
   },
   reservations: {
     create: (body) => request('/reservations', { method: 'POST', body }),
@@ -119,5 +119,13 @@ export const api = {
     updateUser: (id, body) => request(`/admin/users/${id}`, { method: 'PATCH', body }),
     resetUserPassword: (id, body) => request(`/admin/users/${id}/password`, { method: 'PATCH', body }),
     deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
-  }
+  },
+  // Generic HTTP Client Wrapper
+  client: {
+    get: (endpoint) => request(endpoint).then((data) => ({ data })),
+    post: (endpoint, body) => request(endpoint, { method: 'POST', body }).then((data) => ({ data })),
+    patch: (endpoint, body) => request(endpoint, { method: 'PATCH', body }).then((data) => ({ data })),
+    put: (endpoint, body) => request(endpoint, { method: 'PUT', body }).then((data) => ({ data })),
+    delete: (endpoint) => request(endpoint, { method: 'DELETE' }).then((data) => ({ data })),
+  },
 };

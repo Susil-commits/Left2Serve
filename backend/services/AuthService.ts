@@ -10,8 +10,7 @@ import QRCode from 'qrcode';
 
 const SECRET = process.env.JWT_SECRET;
 if (!SECRET) {
-  // Belt-and-suspenders guard — auth.ts middleware already enforces this at startup,
-  // but guard here too so jwt.sign() failures are obvious rather than cryptic.
+  // Fatal config check
   console.error('FATAL: JWT_SECRET is not set. AuthService cannot function.');
   process.exit(1);
 }
@@ -43,7 +42,7 @@ export class AuthService {
     const user = await get('SELECT id, name, email, role, token_version FROM users WHERE id = ?', [id]);
     const token = this.signToken(user);
     
-    // Send welcome email asynchronously
+    // Async welcome email
     sendWelcomeEmail(normalizedEmail, String(name).trim()).catch(console.error);
 
     return { token, user: { id, name: user.name, email: normalizedEmail, role } };
@@ -88,13 +87,12 @@ export class AuthService {
       }
     }
 
-    // Always clear failed attempts and any lingering lock on successful login
+    // Reset lockout
     await run('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?', [user.id]);
 
     const token = this.signToken(user);
 
-    // Reconstruct the response from an explicit safe allowlist.
-    // Never spread the full DB row — it may include reset_token, two_factor_secret, etc.
+    // Secure user payload reconstruction
     const safeUser = {
       id: user.id,
       name: user.name,

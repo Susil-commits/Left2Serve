@@ -67,7 +67,7 @@ export default function FoodDetail() {
         const order = await api.payments.createOrder({ food_listing_id: listing.id, quantity: parseInt(quantity), pickup_time: pickupTime || null, notes: notes || null });
         const paid = await openRazorpayCheckout(order, user);
         if (!paid) {
-          try { await api.reservations.update(order.reservation_id, { status: 'cancelled' }); } catch { /* best-effort release */ }
+          try { await api.reservations.update(order.reservation_id, { status: 'cancelled' }); } catch { /* Best-effort release */ }
           addToast('Payment cancelled. Your reservation was released.', 'error');
           await loadListing();
           return;

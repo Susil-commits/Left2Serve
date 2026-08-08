@@ -40,9 +40,7 @@ app.set('trust proxy', 1);
 
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 
-// Build the allowed-origin list: explicit CLIENT_URL value(s) plus any
-// *.vercel.app deployment and localhost dev servers, so the exact domain
-// spelling in CLIENT_URL can't break CORS.
+// CORS origin configuration
 const allowedOrigins = new Set([
   ...clientUrl.split(',').map((s) => s.trim()).filter(Boolean),
   'http://localhost:5173',
@@ -50,7 +48,7 @@ const allowedOrigins = new Set([
   'http://127.0.0.1:5173',
 ]);
 function corsOrigin(origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) {
-  if (!origin) return cb(null, true); // same-origin / curl / postman
+  if (!origin) return cb(null, true);
   if (allowedOrigins.has(origin) || /\.vercel\.app$/.test(new URL(origin).hostname)) return cb(null, true);
   cb(new Error(`CORS blocked: ${origin}`));
 }
@@ -116,9 +114,7 @@ app.use(errorHandler);
 
 export const io = new SocketIOServer(server, {
   cors: {
-    // Mirror the exact same origin-allow logic used for HTTP CORS so that
-    // *.vercel.app preview deployments (which pass the HTTP check via regex)
-    // are not silently rejected by Socket.IO's stricter static-array check.
+    // Socket.IO CORS configuration
     origin: (origin, cb) => corsOrigin(origin, (err, allow) => {
       if (err) cb(err);
       else cb(null, allow ? origin : false);

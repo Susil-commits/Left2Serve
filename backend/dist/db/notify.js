@@ -11,6 +11,6 @@ export async function createNotification(userId, type, title, message, data = {}
         }).catch(err => console.error('Failed to emit socket notification', err));
     }
     catch {
-        // notifications are best-effort and must never break the calling flow
+        // Best-effort notification delivery
     }
 }

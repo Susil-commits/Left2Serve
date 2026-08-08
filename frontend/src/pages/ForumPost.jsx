@@ -118,10 +118,7 @@ export default function ForumPost() {
 
   const { post, replies } = data;
   
-  // Can we reply? We can check if our role is in write_roles of this category.
-  // Wait, backend will enforce this on the POST, but for UI:
-  // (We don't strictly have category write_roles in this payload, but the backend rejects it.
-  // For simplicity, we just show the reply box and let the backend 403 if they can't.)
+  // Reply authorization fallback
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-transition">

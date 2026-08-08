@@ -1,5 +1,8 @@
 import xss from 'xss';
-const sanitize = (data) => {
+const sanitize = (data, keyName) => {
+    if (keyName && ['password', 'newPassword', 'current'].includes(keyName)) {
+        return data;
+    }
     if (typeof data === 'string') {
         return xss(data);
     }
@@ -10,7 +13,7 @@ const sanitize = (data) => {
         const sanitizedObj = {};
         for (const key in data) {
             if (Object.prototype.hasOwnProperty.call(data, key)) {
-                sanitizedObj[key] = sanitize(data[key]);
+                sanitizedObj[key] = sanitize(data[key], key);
             }
         }
         return sanitizedObj;

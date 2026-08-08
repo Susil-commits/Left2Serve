@@ -87,15 +87,15 @@ export default function Home() {
     const noticeTimeout = setTimeout(() => {
       isFast = false;
       setShowNotice(true);
-    }, 1500); // Delay showing to avoid impacting initial render (FCP/LCP)
+    }, 1500); // Render delay threshold
 
     api.listings.getStats().then((data) => {
       setStats(data);
       setServerAwake(true);
       if (isFast) {
-        clearTimeout(noticeTimeout); // Never show if it loaded quickly
+        clearTimeout(noticeTimeout); // Fast-load prevention
       } else {
-        setTimeout(() => setShowNotice(false), 5000); // Hide 5 seconds after waking up
+        setTimeout(() => setShowNotice(false), 5000); // Auto-hide timeout
       }
     }).catch(() => {});
 

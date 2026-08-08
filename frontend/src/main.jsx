@@ -7,7 +7,7 @@ import { registerSW } from 'virtual:pwa-register'
 
 registerSW({
   onNeedRefresh() {
-    // Optionally prompt user to refresh
+    // Refresh prompt hook
   },
   onOfflineReady() {
     console.log('App is ready to work offline');

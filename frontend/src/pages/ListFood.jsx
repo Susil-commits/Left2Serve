@@ -24,6 +24,7 @@ export default function ListFood() {
   });
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
   const [position, setPosition] = useState(null);
   const navigate = useNavigate();
@@ -99,15 +100,36 @@ export default function ListFood() {
       addToast('Please enter a title and select a category first', 'error');
       return;
     }
-    setLoading(true);
+    setAiLoading(true);
     try {
       const res = await api.client.post('/ai/describe', { title: form.title, category: form.category });
-      setForm({ ...form, description: res.data.description });
+      setForm(prev => ({ ...prev, description: res.data.description }));
       addToast('Description generated!', 'success');
     } catch (err) {
       addToast(err.response?.data?.error || 'Failed to generate description', 'error');
     }
-    setLoading(false);
+    setAiLoading(false);
+  };
+
+  const handleAnalyzeImage = async () => {
+    if (!form.image_urls || form.image_urls.length === 0) {
+      addToast('Please upload an image first', 'error');
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const res = await api.listings.analyzeImage({ imageUrl: form.image_urls[0] });
+      setForm(prev => ({ 
+        ...prev, 
+        title: res.title || prev.title, 
+        description: res.description || prev.description, 
+        category: res.category || prev.category 
+      }));
+      addToast('AI successfully analyzed the image!', 'success');
+    } catch (err) {
+      addToast(err.response?.data?.error || err.message || 'Failed to analyze image', 'error');
+    }
+    setAiLoading(false);
   };
 
   const isFormValid = form.title && form.category && form.quantity && form.expiry_date && form.pickup_address && form.has_safety_checklist;
@@ -154,7 +176,7 @@ export default function ListFood() {
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="block text-sm font-semibold text-text">{t('list_food.description_label')}</label>
-              <button type="button" onClick={handleGenerateDescription} disabled={loading} className="text-xs font-semibold text-accent flex items-center gap-1 hover:underline disabled:opacity-50 disabled:no-underline">
+              <button type="button" onClick={handleGenerateDescription} disabled={aiLoading} className="text-xs font-semibold text-accent flex items-center gap-1 hover:underline disabled:opacity-50 disabled:no-underline">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                 Auto-Describe
               </button>
@@ -243,9 +265,16 @@ export default function ListFood() {
         </div>
 
         <div className="bg-gray-50 rounded-2xl p-5 border border-border">
-          <h3 className="text-sm font-bold text-text uppercase tracking-wider flex items-center gap-2 mb-4">
-            <span className="w-2 h-2 rounded-full bg-accent" />{t('list_food.photos')} <span className="text-xs text-muted normal-case font-medium">(up to 5)</span>
-          </h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-bold text-text uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-accent" />{t('list_food.photos')} <span className="text-xs text-muted normal-case font-medium">(up to 5)</span>
+            </h3>
+            {form.image_urls.length > 0 && (
+              <button type="button" onClick={handleAnalyzeImage} disabled={aiLoading} className="text-xs font-semibold text-accent flex items-center gap-1 hover:underline disabled:opacity-50 disabled:no-underline bg-accent/10 px-2 py-1 rounded-md">
+                {aiLoading ? '⏳ Analyzing...' : '✨ Auto-fill with AI'}
+              </button>
+            )}
+          </div>
           <ImageUpload images={form.image_urls} onUpload={(urls) => setForm({ ...form, image_urls: urls })} onRemove={(i) => setForm({ ...form, image_urls: form.image_urls.filter((_, idx) => idx !== i) })} />
         </div>
 

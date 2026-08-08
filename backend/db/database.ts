@@ -1,22 +1,16 @@
 import pg, { Pool, PoolConfig } from 'pg';
 
-// PostgreSQL returns BIGINT (COUNT(*)) and NUMERIC (SUM) as strings by default.
-// Parse them as Numbers — safe for the scale of this app.
+// PostgreSQL type parsers
 pg.types.setTypeParser(20, (v: string | null) => (v == null ? null : Number(v))); // int8 / bigint
 pg.types.setTypeParser(1700, (v: string | null) => (v == null ? null : Number(v))); // numeric / decimal
 
 let pool: Pool | null = null;
 
-// Convert MySQL-style "?" placeholders into PostgreSQL "$N" placeholders so the
-// route files can keep using the familiar "?" syntax without per-query renumbering.
-// The parser correctly handles '' (escaped single quotes) inside SQL strings.
-// NOTE: PostgreSQL JSON operators ?| and ?& are NOT supported — use $N params directly for those.
+// SQL placeholder formatting (? to $N)
 
 function formatQuery(sql: string, params: any[]): string {
   if (!Array.isArray(params) || params.length === 0) return sql;
-  // Safety: PostgreSQL JSON operators ?| and ?& use literal `?` and will be
-  // mis-parsed as parameter placeholders. Callers that need those operators
-  // must use $1-style params and NOT pass them through this function.
+  // JSON operator safety check
   if (/\?\||\?&/.test(sql)) {
     throw new Error('formatQuery: SQL contains ?| or ?& JSON operators which conflict with ? placeholders. Use $N params directly.');
   }
@@ -27,16 +21,16 @@ function formatQuery(sql: string, params: any[]): string {
   while (j < sql.length) {
     const char = sql[j];
     if (char === "'" && !inString) {
-      // Check for escaped quote '' (two consecutive quotes outside a string = start of empty string literal)
+      // Escaped quotes
       inString = true;
       result += char;
       j++;
       continue;
     }
     if (char === "'" && inString) {
-      // Check if next char is also ' (escaped quote inside string)
+
       if (sql[j + 1] === "'") {
-        result += "''"; // emit both, stay in string
+        result += "''";
         j += 2;
         continue;
       }
@@ -86,7 +80,7 @@ async function getPool(): Promise<Pool> {
   if (pool) return pool;
   const cfg = buildConfig();
   pool = new Pool({ ...cfg, max: parseInt(process.env.DB_POOL_MAX || '10') });
-  // verify connectivity early with a clear error
+  // Initial connection check
   const client = await pool.connect();
   client.release();
   return pool;
@@ -119,15 +113,7 @@ async function insert(sql: string, params: any[] = []): Promise<number | null> {
 }
 
 /**
- * Run a callback inside an explicit PostgreSQL transaction.
- * All DB calls made via the client passed to the callback share the same
- * connection and are rolled back automatically on any thrown error.
- *
- * Example:
- *   const result = await withTransaction(async (client) => {
- *     await client.run('INSERT ...');
- *     return await client.get('SELECT ...');
- *   });
+ * Transaction wrapper
  */
 async function withTransaction<T>(
   fn: (client: {

@@ -8,6 +8,11 @@ import { AppError } from '../utils/AppError.js';
 import { generateSecret, generateURI, verifySync } from 'otplib';
 import QRCode from 'qrcode';
 const SECRET = process.env.JWT_SECRET;
+if (!SECRET) {
+    // Fatal config check
+    console.error('FATAL: JWT_SECRET is not set. AuthService cannot function.');
+    process.exit(1);
+}
 const MAX_FAILED = 5;
 export class AuthService {
     static signToken(user) {
@@ -23,7 +28,7 @@ export class AuthService {
         const id = await insert('INSERT INTO users (name, email, password_hash, role, phone, address, organization) VALUES (?, ?, ?, ?, ?, ?, ?)', [String(name).trim(), normalizedEmail, password_hash, role, phone || null, address || null, organization || null]);
         const user = await get('SELECT id, name, email, role, token_version FROM users WHERE id = ?', [id]);
         const token = this.signToken(user);
-        // Send welcome email asynchronously
+        // Async welcome email
         sendWelcomeEmail(normalizedEmail, String(name).trim()).catch(console.error);
         return { token, user: { id, name: user.name, email: normalizedEmail, role } };
     }
@@ -62,10 +67,24 @@ export class AuthService {
                 throw new AppError(401, 'Invalid two-factor authentication code');
             }
         }
-        // Always clear failed attempts and any lingering lock on successful login
+        // Reset lockout
         await run('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?', [user.id]);
         const token = this.signToken(user);
-        const { password_hash, token_version, failed_attempts, locked_until, is_active, two_factor_secret, ...safeUser } = user;
+        // Secure user payload reconstruction
+        const safeUser = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            phone: user.phone ?? null,
+            address: user.address ?? null,
+            organization: user.organization ?? null,
+            avatar_url: user.avatar_url ?? null,
+            two_factor_enabled: !!user.two_factor_enabled,
+            meals_saved: user.meals_saved ?? 0,
+            badges: user.badges ?? [],
+            created_at: user.created_at,
+        };
         await audit({ actorId: user.id, actorRole: user.role, action: 'login_success', ip });
         return { token, user: safeUser };
     }
@@ -133,8 +152,33 @@ export class AuthService {
         }
     }
     static async updateProfile(userId, payload) {
-        const { name, phone, address, organization, avatar_url } = payload;
-        await run('UPDATE users SET name = ?, phone = ?, address = ?, organization = ?, avatar_url = ? WHERE id = ?', [name != null ? String(name).trim() : null, phone || null, address || null, organization || null, avatar_url || null, userId]);
+        const fields = [];
+        const values = [];
+        if (payload.name !== undefined) {
+            fields.push('name = ?');
+            values.push(payload.name != null ? String(payload.name).trim() : null);
+        }
+        if (payload.phone !== undefined) {
+            fields.push('phone = ?');
+            values.push(payload.phone || null);
+        }
+        if (payload.address !== undefined) {
+            fields.push('address = ?');
+            values.push(payload.address || null);
+        }
+        if (payload.organization !== undefined) {
+            fields.push('organization = ?');
+            values.push(payload.organization || null);
+        }
+        if (payload.avatar_url !== undefined) {
+            fields.push('avatar_url = ?');
+            values.push(payload.avatar_url || null);
+        }
+        if (fields.length > 0) {
+            values.push(userId);
+            const query = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
+            await run(query, values);
+        }
         return await get('SELECT id, name, email, role, phone, address, organization, avatar_url, created_at FROM users WHERE id = ?', [userId]);
     }
     static async updatePassword(userId, role, payload, ip) {

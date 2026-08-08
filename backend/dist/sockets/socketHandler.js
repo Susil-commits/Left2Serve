@@ -24,22 +24,28 @@ export function setupSocketHandlers(io) {
                 socket.emit('error', 'Invalid reservation ID');
                 return;
             }
-            const reservation = await get('SELECT * FROM reservations WHERE id = ?', [rId]);
-            if (!reservation)
-                return;
-            const listing = await get('SELECT user_id FROM food_listings WHERE id = ?', [reservation.food_listing_id]);
-            const isReserver = socket.data.user.id === reservation.user_id;
-            const isDonor = listing && socket.data.user.id === listing.user_id;
-            const isAdmin = socket.data.user.role === 'admin';
-            if (isReserver || isDonor || isAdmin) {
-                socket.join(`reservation_${rId}`);
+            try {
+                const reservation = await get('SELECT * FROM reservations WHERE id = ?', [rId]);
+                if (!reservation)
+                    return;
+                const listing = await get('SELECT user_id FROM food_listings WHERE id = ?', [reservation.food_listing_id]);
+                const isReserver = socket.data.user.id === reservation.user_id;
+                const isDonor = listing && socket.data.user.id === listing.user_id;
+                const isAdmin = socket.data.user.role === 'admin';
+                if (isReserver || isDonor || isAdmin) {
+                    socket.join(`reservation_${rId}`);
+                }
+            }
+            catch (err) {
+                console.error('Socket: join_reservation DB error', err);
+                socket.emit('error', 'Failed to join reservation');
             }
         });
         socket.on('send_message', async (data) => {
             const { reservationId, content } = data;
             if (!content || !reservationId)
                 return;
-            // Clamp message length to prevent oversized payloads
+            // Message length boundary clamp
             const safeContent = String(content).slice(0, 2000);
             const rId = Number(reservationId);
             if (!Number.isInteger(rId) || rId <= 0) {

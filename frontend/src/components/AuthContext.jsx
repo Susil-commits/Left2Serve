@@ -13,8 +13,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    // Guard against the server being unreachable: if /me doesn't settle within 8s,
-    // clear the loading spinner and remove the stale token so the app stays usable.
+    // Auth fetch timeout guard
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     api.auth.me()
