@@ -9,7 +9,7 @@
     "start": "node dist/server.js",
     "start:prod": "cross-env NODE_ENV=production node dist/server.js",
     "dev": "tsx watch server.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "test": "vitest run"
   },
   "dependencies": {
