@@ -2,7 +2,6 @@ import { all, query } from './database.js';
 
 export async function sweepExpiredListings(): Promise<number> {
   try {
-    // Atomic status update
     const rows = await query<{ id: number }>(
       "UPDATE food_listings SET status = 'expired' WHERE status = 'available' AND expiry_date < NOW() RETURNING id"
     );

@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 export function validateIdParam(paramName: string = 'id') {
   return (req: Request, res: Response, next: NextFunction) => {
     const val = req.params[paramName];
-    if (val === undefined) return next(); // Not present in route
+    if (val === undefined) return next();
 
     const num = Number(val);
     if (!Number.isInteger(num) || num <= 0) {

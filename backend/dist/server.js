@@ -48,7 +48,6 @@ const server = http.createServer(app);
 const isProduction = process.env.NODE_ENV === 'production';
 app.set('trust proxy', 1);
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-// CORS origin configuration
 const allowedOrigins = new Set([
     ...clientUrl.split(',').map((s) => s.trim()).filter(Boolean),
     'http://localhost:5173',
@@ -82,12 +81,10 @@ app.use(helmet({
 app.use(cors({ origin: corsOrigin, credentials: true, maxAge: 86400 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(compression());
-// Inject Request ID
 app.use((req, res, next) => {
     req.reqId = uuidv4();
     next();
 });
-// XSS Sanitization
 app.use(xssClean);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(morgan(isProduction ? 'combined' : 'dev'));
@@ -114,7 +111,6 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/health/notifications', (req, res) => {
     res.json(getNotificationHealth());
 });
-// Mount tRPC router
 app.use('/trpc', trpcExpress.createExpressMiddleware({
     router: appRouter,
     createContext,
@@ -124,7 +120,6 @@ Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler);
 export const io = new SocketIOServer(server, {
     cors: {
-        // Socket.IO CORS configuration
         origin: (origin, cb) => corsOrigin(origin, (err, allow) => {
             if (err)
                 cb(err);

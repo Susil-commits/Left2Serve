@@ -30,7 +30,6 @@ export class BadgeService {
     for (const badge of newBadgesToAward) {
       updatedBadges.push(badge.id);
       
-      // Badge notification
       await createNotification(
         userId,
         'badge_earned',

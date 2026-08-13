@@ -1,4 +1,3 @@
-// API Base Configuration
 function resolveApiBase() {
   const raw = (import.meta.env.VITE_API_URL || '').trim();
   if (!raw) return '/api';
@@ -120,7 +119,6 @@ export const api = {
     resetUserPassword: (id, body) => request(`/admin/users/${id}/password`, { method: 'PATCH', body }),
     deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
   },
-  // Generic HTTP Client Wrapper
   client: {
     get: (endpoint) => request(endpoint).then((data) => ({ data })),
     post: (endpoint, body) => request(endpoint, { method: 'POST', body }).then((data) => ({ data })),

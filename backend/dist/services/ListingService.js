@@ -219,7 +219,6 @@ export class ListingService {
         const dietaryTags = dietary_preferences !== undefined ? (Array.isArray(dietary_preferences) ? dietary_preferences : []) : listing.dietary_preferences;
         const lat = latitude !== undefined ? (latitude ? Number(latitude) : null) : listing.latitude;
         const lng = longitude !== undefined ? (longitude ? Number(longitude) : null) : listing.longitude;
-        // Dynamic DB import
         const { run } = await import('../db/database.js');
         const { recomputeListingStatus } = await import('../db/availability.js');
         await run(`UPDATE food_listings SET title=?, description=?, category=?, quantity=?, unit=?, price=?, expiry_date=?, pickup_address=?, pickup_instructions=?, image_urls=?, dietary_preferences=?, status=?, latitude=?, longitude=? WHERE id=?`, [title ? String(title).trim() : listing.title, description ?? listing.description, nextCategory, nextQty, unit || listing.unit, price ?? listing.price, nextExpiry, pickup_address ? String(pickup_address).trim() : listing.pickup_address, pickup_instructions ?? listing.pickup_instructions, JSON.stringify(images), JSON.stringify(dietaryTags), status || listing.status, lat, lng, id]);

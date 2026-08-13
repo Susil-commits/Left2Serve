@@ -10,7 +10,6 @@ import QRCode from 'qrcode';
 
 const SECRET = process.env.JWT_SECRET;
 if (!SECRET) {
-  // Fatal config check
   console.error('FATAL: JWT_SECRET is not set. AuthService cannot function.');
   process.exit(1);
 }
@@ -42,7 +41,6 @@ export class AuthService {
     const user = await get('SELECT id, name, email, role, token_version FROM users WHERE id = ?', [id]);
     const token = this.signToken(user);
     
-    // Async welcome email
     sendWelcomeEmail(normalizedEmail, String(name).trim()).catch(console.error);
 
     return { token, user: { id, name: user.name, email: normalizedEmail, role } };
@@ -87,12 +85,10 @@ export class AuthService {
       }
     }
 
-    // Reset lockout
     await run('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?', [user.id]);
 
     const token = this.signToken(user);
 
-    // Secure user payload reconstruction
     const safeUser = {
       id: user.id,
       name: user.name,

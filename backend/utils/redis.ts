@@ -1,7 +1,6 @@
 import { Redis } from 'ioredis';
-import { logger } from './logger.js'; // Assuming Winston is configured in logger.js
+import { logger } from './logger.js';
 
-// Use REDIS_URL from env, fallback to localhost for development
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
 const isUpstash = redisUrl.includes('upstash.io');

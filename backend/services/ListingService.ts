@@ -236,7 +236,6 @@ export class ListingService {
     const lat = latitude !== undefined ? (latitude ? Number(latitude) : null) : listing.latitude;
     const lng = longitude !== undefined ? (longitude ? Number(longitude) : null) : listing.longitude;
     
-    // Dynamic DB import
     const { run } = await import('../db/database.js');
     const { recomputeListingStatus } = await import('../db/availability.js');
     

@@ -22,7 +22,6 @@ export class BadgeService {
         let updatedBadges = [...currentBadges];
         for (const badge of newBadgesToAward) {
             updatedBadges.push(badge.id);
-            // Badge notification
             await createNotification(userId, 'badge_earned', 'New Badge Earned! 🎉', `Congratulations! You've saved ${newMealsSaved} meals and earned the ${badge.name} ${badge.icon} badge!`, { badgeId: badge.id, newMealsSaved });
         }
         await run('UPDATE users SET meals_saved = ?, badges = ? WHERE id = ?', [

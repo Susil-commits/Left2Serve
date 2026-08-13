@@ -29,7 +29,7 @@ export default function BrowseFood() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
   const [distance, setDistance] = useState('');
-  const [location, setLocation] = useState(null); // Coordinates state
+  const [location, setLocation] = useState(null);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedDietary, setSelectedDietary] = useState([]);
   const [page, setPage] = useState(1);

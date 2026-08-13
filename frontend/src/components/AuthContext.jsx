@@ -13,7 +13,6 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    // Auth fetch timeout guard
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     api.auth.me()

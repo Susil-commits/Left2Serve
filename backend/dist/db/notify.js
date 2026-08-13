@@ -10,7 +10,5 @@ export async function createNotification(userId, type, title, message, data = {}
             });
         }).catch(err => console.error('Failed to emit socket notification', err));
     }
-    catch {
-        // Best-effort notification delivery
-    }
+    catch { }
 }

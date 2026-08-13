@@ -8,9 +8,7 @@ export class ReservationService {
     static async createReservation(userId, payload) {
         const { food_listing_id, quantity, pickup_time, notes, payment_method } = payload;
         const qty = Number(quantity);
-        // Row-level lock transaction
         return await withTransaction(async (tx) => {
-            // Concurrency lock
             const listing = await tx.get('SELECT * FROM food_listings WHERE id = ? FOR UPDATE', [food_listing_id]);
             if (!listing)
                 throw new AppError(404, 'Listing not found');
@@ -38,7 +36,6 @@ export class ReservationService {
             await recomputeListingStatus(food_listing_id);
             const reservation = await tx.get('SELECT * FROM reservations WHERE id = ?', [id]);
             const reserver = await tx.get('SELECT name FROM users WHERE id = ?', [userId]);
-            // Fire-and-forget notification
             await createNotification(listing.user_id, 'reservation_new', 'New reservation request', `${reserver?.name || 'Someone'} requested ${qty} ${listing.unit} of "${listing.title}"`, { reservationId: id, listingId: Number(food_listing_id), reserverName: reserver?.name });
             return reservation;
         });
@@ -93,7 +90,6 @@ export class ReservationService {
         const isReserver = reservation.user_id === userId;
         if (!isOwner && !isReserver)
             throw new AppError(403, 'Not authorized');
-        // Authorization rules
         const allowed = new Set();
         if (isOwner) {
             allowed.add('approved');

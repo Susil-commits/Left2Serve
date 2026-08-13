@@ -32,9 +32,7 @@ const trpcClient = trpc.createClient({
 });
 
 registerSW({
-  onNeedRefresh() {
-    // Refresh prompt hook
-  },
+  onNeedRefresh() {},
   onOfflineReady() {
     console.log('App is ready to work offline');
   },

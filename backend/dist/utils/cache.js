@@ -20,10 +20,8 @@ export const cache = {
         await redis.del(key);
     }
 };
-// Middleware to cache HTTP responses
 export const cacheMiddleware = (durationSecs) => {
     return async (req, res, next) => {
-        // Only cache GET requests
         if (req.method !== 'GET') {
             return next();
         }
@@ -42,12 +40,9 @@ export const cacheMiddleware = (durationSecs) => {
             // Ignore cache read errors and proceed to DB
         }
         res.setHeader('X-Cache', 'MISS');
-        // Response interceptor
         const originalSend = res.send.bind(res);
         res.send = (body) => {
-            // Only cache successful responses
             if (res.statusCode >= 200 && res.statusCode < 300) {
-                // Handle strings/objects based on Express output
                 const stringBody = typeof body === 'object' ? JSON.stringify(body) : body;
                 redis.setex(key, durationSecs, stringBody).catch(() => { });
             }

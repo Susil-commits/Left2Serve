@@ -49,19 +49,11 @@ export async function retryWithBackoff<T>(
       return await fn();
     } catch (error) {
       if (attempt >= opts.retries || !isRetryable(error)) {
-        throw error; // Throw the last error if exhausted or non-retryable
+        throw error;
       }
 
-      // Calculate exponential backoff delay
-      // Min of (base * 2^attempt) and maxDelay
       const expDelay = Math.min(opts.baseDelayMs * Math.pow(2, attempt), opts.maxDelayMs);
-      
-      // Add "Full Jitter": random value between 0 and the calculated exponential delay
-      // Wait, the prompt specifically requested:
-      // "Delay per attempt: min(baseDelayMs * 2^attempt, maxDelayMs) + random jitter (0–baseDelayMs)."
-      // Let's implement exactly what the prompt asked for.
       const jitter = Math.random() * opts.baseDelayMs;
-      
       const finalDelay = expDelay + jitter;
       
       await delay(finalDelay);

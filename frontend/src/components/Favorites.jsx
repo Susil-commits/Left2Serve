@@ -29,7 +29,6 @@ export function useFavorites() {
   };
 }
 
-// Dummy provider to keep App.jsx happy before we clean it up
 export function FavoritesProvider({ children }) {
   return children;
 }

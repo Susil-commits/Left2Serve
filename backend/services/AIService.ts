@@ -3,7 +3,6 @@ import { AppError } from '../utils/AppError.js';
 
 const VALID_CATEGORIES = ['event', 'restaurant', 'hotel', 'caterer', 'household'] as const;
 
-// Lazy client initialization
 function getClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -57,14 +56,12 @@ Keep it under 3 sentences, professional, and empathetic. Do not include quotes a
     description: string;
     category: string;
   }> {
-    // 1. Input Validation
     if (!imageUrl || typeof imageUrl !== 'string') {
       throw new Error('A valid imageUrl is required for AI analysis.');
     }
 
     const ai = getClient();
 
-    // 2. Fetch image
     let base64Data: string;
     let mimeType: string;
 
@@ -78,13 +75,11 @@ Keep it under 3 sentences, professional, and empathetic. Do not include quotes a
         throw new Error('Image fetch returned an empty body');
       }
       base64Data = Buffer.from(arrayBuffer).toString('base64');
-      // MIME type extraction
       mimeType = (fetchRes.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
     } catch (err: any) {
       throw new Error(`Failed to fetch image for analysis: ${err.message}`);
     }
 
-    // 3. Schema Definition
     const responseSchema: Schema = {
       type: Type.OBJECT,
       properties: {
@@ -105,7 +100,6 @@ Keep it under 3 sentences, professional, and empathetic. Do not include quotes a
       required: ['title', 'description', 'category'],
     };
 
-    // 4. API Call
     let aiResponse: Awaited<ReturnType<typeof ai.models.generateContent>>;
     try {
       aiResponse = await ai.models.generateContent({
@@ -139,7 +133,6 @@ Keep it under 3 sentences, professional, and empathetic. Do not include quotes a
       throw new Error(`AI service error: ${msg}`);
     }
 
-    // 5. Response Parsing
     const rawText = aiResponse.text;
     if (!rawText || rawText.trim() === '') {
       throw new Error('AI returned an empty response. Please try again.');
@@ -157,7 +150,6 @@ Keep it under 3 sentences, professional, and empathetic. Do not include quotes a
       throw new Error('AI response is missing required fields (title, description, category).');
     }
 
-    // Category validation
     if (!VALID_CATEGORIES.includes(parsed.category as any)) {
       parsed.category = 'household';
     }

@@ -8,28 +8,23 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 export default function PushNotificationManager() {
   const { user } = useAuth();
   const { addToast } = useToast();
-  // Token rotation tracking
   const tokenRef = useRef(null);
 
   useEffect(() => {
     if (!user) return;
 
-    // Lazy permission request
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {});
     }
 
     const token = localStorage.getItem('token');
-    // Token requirement
     if (!token) return;
 
-    // Socket deduplication
     if (tokenRef.current === token) return;
     tokenRef.current = token;
 
     const socket = io(API_BASE_URL, {
       auth: { token },
-
       reconnectionAttempts: 5,
     });
 
@@ -53,10 +48,8 @@ export default function PushNotificationManager() {
 
     return () => {
       socket.disconnect();
-
       tokenRef.current = null;
     };
-  // Effect dependencies
   }, [user, addToast]);
 
   return null;

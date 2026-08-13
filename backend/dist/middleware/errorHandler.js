@@ -4,7 +4,6 @@ export const errorHandler = (err, req, res, next) => {
     const statusCode = err.statusCode || 500;
     const isOperational = err instanceof AppError ? err.isOperational : false;
     const reqId = req.reqId;
-    // Log the error
     if (statusCode >= 500) {
         logger.error(err.message || 'Internal Server Error', { stack: err.stack, reqId });
     }
@@ -37,7 +36,6 @@ export const errorHandler = (err, req, res, next) => {
                 return res.status(400).json({ error: 'Missing required field.' });
         }
     }
-    // Fallback error handler
     const isProduction = process.env.NODE_ENV === 'production';
     return res.status(statusCode).json({
         error: isProduction ? 'Internal Server Error' : err.message,

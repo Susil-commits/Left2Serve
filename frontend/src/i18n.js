@@ -21,7 +21,7 @@ i18n
     resources,
     fallbackLng: 'en',
     interpolation: {
-      escapeValue: false // React XSS safety
+      escapeValue: false
     }
   });
 

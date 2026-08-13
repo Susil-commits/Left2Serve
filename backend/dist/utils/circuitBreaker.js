@@ -59,18 +59,15 @@ export class CircuitBreaker {
         }
         try {
             const result = await fn();
-            // On success
             if (this.state === 'HALF_OPEN') {
                 this.transitionTo('CLOSED');
             }
             else {
-                // We are in CLOSED state. Reset failures on success.
                 this.consecutiveFailures = 0;
             }
             return result;
         }
         catch (error) {
-            // On failure
             if (this.state === 'HALF_OPEN') {
                 this.transitionTo('OPEN');
             }

@@ -21,7 +21,6 @@ function formatQuery(sql, params) {
     while (j < sql.length) {
         const char = sql[j];
         if (char === "'" && !inString) {
-            // Escaped quotes
             inString = true;
             result += char;
             j++;
@@ -82,7 +81,6 @@ async function getPool() {
     if (pool)
         return pool;
     pool = pgPool;
-    // Initial connection check
     const client = await pool.connect();
     client.release();
     return pool;

@@ -16,7 +16,5 @@ export async function audit({ actorId, actorRole, action, targetType, targetId, 
       'INSERT INTO audit_log (actor_id, actor_role, action, target_type, target_id, detail, ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [actorId ?? null, actorRole ?? null, action, targetType ?? null, targetId ?? null, detail ?? null, ip ?? null]
     );
-  } catch {
-    // Audit failure fallback
-  }
+  } catch {}
 }

@@ -24,7 +24,6 @@ function formatQuery(sql: string, params: any[]): string {
   while (j < sql.length) {
     const char = sql[j];
     if (char === "'" && !inString) {
-      // Escaped quotes
       inString = true;
       result += char;
       j++;
@@ -87,7 +86,6 @@ export const prisma = new PrismaClient({ adapter });
 async function getPool(): Promise<Pool> {
   if (pool) return pool;
   pool = pgPool;
-  // Initial connection check
   const client = await pool.connect();
   client.release();
   return pool;

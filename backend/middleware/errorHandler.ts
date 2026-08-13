@@ -7,7 +7,6 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
   const isOperational = err instanceof AppError ? err.isOperational : false;
   const reqId = (req as any).reqId;
 
-  // Log the error
   if (statusCode >= 500) {
     logger.error(err.message || 'Internal Server Error', { stack: err.stack, reqId });
   } else {
@@ -43,7 +42,6 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
     }
   }
 
-  // Fallback error handler
   const isProduction = process.env.NODE_ENV === 'production';
   return res.status(statusCode).json({
     error: isProduction ? 'Internal Server Error' : err.message,

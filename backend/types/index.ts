@@ -31,7 +31,7 @@ export interface FoodListing {
 export interface Reservation {
   id: number;
   food_listing_id: number;
-  user_id: number; // Reserver role marker
+  user_id: number;
   quantity: number;
   status: 'pending' | 'approved' | 'collected' | 'cancelled';
   created_at: Date;
@@ -56,7 +56,6 @@ export interface Notification {
   created_at: Date;
 }
 
-// Express Request extension
 declare global {
   namespace Express {
     interface Request {

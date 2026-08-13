@@ -14,10 +14,8 @@ const connection = new Redis(redisUrl, {
   tls: isUpstash ? {} : undefined 
 });
 
-// Create the unified background queue
 export const backgroundQueue = new Queue('background-jobs', { connection });
 
-// Define the Worker
 export const backgroundWorker = new Worker('background-jobs', async (job) => {
   switch (job.name) {
     case 'sweep-expired': {
@@ -28,11 +26,9 @@ export const backgroundWorker = new Worker('background-jobs', async (job) => {
     case 'daily-maintenance': {
       logger.info('BullMQ: Running daily maintenance...');
       
-      // 1. Purge old notifications
       await run("DELETE FROM notifications WHERE is_read = TRUE AND created_at < NOW() - INTERVAL '30 days'");
       logger.info('BullMQ: Old read notifications purged');
       
-      // 2. Cancel orphaned reservations
       await run(`
         UPDATE reservations
         SET status = 'cancelled'
@@ -56,15 +52,12 @@ backgroundWorker.on('failed', (job, err) => {
   logger.error(`BullMQ Job ${job?.name} failed:`, err);
 });
 
-// Setup repeatable jobs
 export async function setupBackgroundJobs() {
-  // Sweep every 5 minutes
   await backgroundQueue.upsertJobScheduler('sweep-expired-scheduler', 
     { pattern: '*/5 * * * *' },
     { name: 'sweep-expired' }
   );
 
-  // Daily maintenance at midnight
   await backgroundQueue.upsertJobScheduler('daily-maintenance-scheduler', 
     { pattern: '0 0 * * *' },
     { name: 'daily-maintenance' }

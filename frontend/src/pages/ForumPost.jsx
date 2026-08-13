@@ -12,11 +12,9 @@ export default function ForumPost() {
   const [newReply, setNewReply] = useState('');
   const [submitting, setSubmitting] = useState(false);
   
-  // Edit post state
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [editPostForm, setEditPostForm] = useState({ title: '', content: '' });
   
-  // Edit reply state
   const [editingReplyId, setEditingReplyId] = useState(null);
   const [editReplyContent, setEditReplyContent] = useState('');
 
@@ -44,7 +42,7 @@ export default function ForumPost() {
     try {
       await api.forum.createReply(postId, { content: newReply });
       setNewReply('');
-      loadPost(); // Reload to get new reply
+      loadPost();
     } catch (err) {
       alert(err.message || 'Failed to post reply');
     } finally {
@@ -117,8 +115,6 @@ export default function ForumPost() {
   }
 
   const { post, replies } = data;
-  
-  // Reply authorization fallback
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-transition">

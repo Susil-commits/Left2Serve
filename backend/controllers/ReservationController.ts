@@ -33,7 +33,6 @@ export class ReservationController {
       if (reservation.user_id !== req.user!.id) throw new AppError(403, 'Not authorized');
       if (reservation.status !== 'approved') throw new AppError(400, 'Only approved reservations can be collected');
 
-      // 1-hour token expiration
       const token = jwt.sign({ reservationId: reservation.id, action: 'collect' }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
       res.json({ token });
     } catch (err) { next(err); }
