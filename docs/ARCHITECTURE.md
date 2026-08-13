@@ -1,55 +1,36 @@
-# 🍲 Left2Serve
+# 🏛️ Left2Serve System Architecture & Technical Design
 
-> A modernized, cloud-native platform dedicated to reducing food waste by connecting surplus food from restaurants and individuals with those in need.
-
----
-
-## 📖 Table of Contents
-- [About the Project](#about-the-project)
-- [Key Features](#key-features)
-- [Architecture & Tech Stack](#architecture--tech-stack)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Quick Start (Docker)](#quick-start-docker)
-  - [Manual Setup](#manual-setup)
-- [CI/CD & Production](#cicd--production)
-- [Contributing](#contributing)
+This document details the software architecture, system components, data models, communication flows, and deployment topologies of the **Left2Serve** platform.
 
 ---
 
-## 🌍 About the Project
-
-Left2Serve bridges the gap between food surplus and food insecurity. By providing a scalable and intuitive platform, we enable restaurants, grocery stores, and individuals to easily donate their excess food to local shelters and communities in need.
-
-## ✨ Key Features
-- **Real-time Connectivity:** Connects food donors with recipients efficiently.
-- **Modernized Architecture:** Highly scalable, observable, and modular system.
-- **Strangler Fig Migration:** Seamlessly migrating from a legacy SPA to a modern SSR framework.
-- **Asynchronous Processing:** Robust background job handling for notifications and cleanups.
+## 📑 Table of Contents
+1. [High-Level System & Component Architecture](#1-high-level-system--component-architecture)
+2. [Dual-Frontend & Migration Architecture (Strangler Fig Pattern)](#2-dual-frontend--migration-architecture-strangler-fig-pattern)
+3. [End-to-End Donation & Claiming Workflow](#3-end-to-end-donation--claiming-workflow)
+4. [Real-Time Messaging & Background Worker Subsystem](#4-real-time-messaging--background-worker-subsystem)
+5. [Database Entity-Relationship Diagram (ERD)](#5-database-entity-relationship-diagram-erd)
 
 ---
 
-## 🏗 Architecture & Tech Stack
+## 1. High-Level System & Component Architecture
 
-Left2Serve is built with a decoupled, cloud-native architecture, separating the backend API from the dual frontend clients to ensure rapid delivery, high availability, and horizontal scalability.
-
-> 📖 **Full Architectural Specification:** For deep technical design, see the [Architecture Documentation](docs/ARCHITECTURE.md).
-
-### 1. System & Component Architecture
+Left2Serve is structured as a cloud-native, decoupled platform featuring dual client frontends, an Express + tRPC API backend, relational and in-memory databases, asynchronous background workers, and third-party integrations.
 
 ```mermaid
 flowchart TB
+    %% Users / Actors
     subgraph Clients["👥 Client Layer"]
-        Donor["Donor (Restaurants / Individuals)"]
+        Donor["Donor\n(Restaurants / Individuals)"]
         NGO["NGO / Shelter Staff"]
         Volunteer["Volunteer Driver"]
         Admin["System Administrator"]
     end
 
+    %% Edge & Presentation
     subgraph Presentation["🌐 Ingress & Presentation Layer"]
-        NextApp["Next.js 15 App Router\n(SSR / SEO / Public Feed :3001)"]
-        ViteApp["React + Vite SPA\n(Client Dashboards / Maps :3000)"]
+        NextApp["Modern Next.js 15 App Router\n(SSR / SEO / Public Pages :3001)"]
+        ViteApp["Legacy React + Vite SPA\n(Client Dashboards / Maps :3000)"]
     end
 
     Donor --> NextApp
@@ -58,24 +39,32 @@ flowchart TB
     Volunteer --> ViteApp
     Admin --> ViteApp
 
+    %% Security & Gateway
     subgraph Gateway["🛡️ Security & API Gateway Layer"]
-        Security["Helmet (CSP, HSTS) • Dynamic CORS • Rate Limiters • XSS Sanitization • JWT/2FA Auth"]
+        Helmet["Helmet (CSP, HSTS)"]
+        Cors["Dynamic CORS Guard"]
+        RateLimit["Rate Limiters (API, Auth, AI)"]
+        XSS["XSS Sanitization Middleware"]
+        AuthMiddleware["JWT + RBAC + 2FA Auth"]
     end
 
-    NextApp --> Security
-    ViteApp --> Security
+    NextApp --> Helmet
+    ViteApp --> Helmet
+    Helmet --> Cors --> RateLimit --> XSS --> AuthMiddleware
 
+    %% Backend Services
     subgraph Backend["⚙️ Backend Core (Node.js & Express :5000)"]
         RestAPI["REST API Routes\n(/api/auth, /api/listings, /api/reservations, /api/forum)"]
-        TRPCRouter["tRPC Router\n(Type-Safe RPC Endpoints)"]
-        SocketServer["Socket.IO Server\n(Real-Time Chat & Push Notifications)"]
-        CronManager["BullMQ Schedulers\n(Cron Sweepers & Tasks)"]
+        TRPCRouter["tRPC Router\n(Type-safe procedures)"]
+        SocketServer["Socket.IO Server\n(Real-time chat & notifications)"]
+        CronManager["BullMQ Schedulers\n(Repeatable Cron Sweepers)"]
     end
 
-    Security --> RestAPI
-    Security --> TRPCRouter
+    AuthMiddleware --> RestAPI
+    AuthMiddleware --> TRPCRouter
     ViteApp <-->|WebSocket| SocketServer
 
+    %% Storage & Cache
     subgraph Persistence["💾 Data & Cache Layer"]
         Postgres[(PostgreSQL Database\nManaged by Prisma ORM)]
         RedisCache[(Redis / Upstash\nCache & Rate Limit Store)]
@@ -87,6 +76,7 @@ flowchart TB
     RestAPI --> RedisCache
     CronManager --> BullQueue
 
+    %% Workers
     subgraph Workers["⚡ Async Background Workers"]
         Worker["BullMQ Worker Instance\n(TTL Sweeper, Daily Maintenance, Email Sender)"]
     end
@@ -94,6 +84,7 @@ flowchart TB
     BullQueue --> Worker
     Worker --> Postgres
 
+    %% External Services
     subgraph External["☁️ External Services & Integrations"]
         Gemini["Google Gemini AI\n(Smart Listing Descriptions)"]
         Razorpay["Razorpay Gateway\n(Payment & Order Verification)"]
@@ -111,7 +102,9 @@ flowchart TB
 
 ---
 
-### 2. Dual-Frontend Migration Architecture (Strangler Fig Pattern)
+## 2. Dual-Frontend & Migration Architecture (Strangler Fig Pattern)
+
+Left2Serve uses the **Strangler Fig Pattern** to migrate incrementally from a legacy Vite single-page application (SPA) to a modern Next.js 15 Server-Side Rendered (SSR) architecture without operational downtime.
 
 ```mermaid
 flowchart LR
@@ -155,7 +148,9 @@ flowchart LR
 
 ---
 
-### 3. Core Business Lifecycle: Donation to Claim Sequence
+## 3. End-to-End Donation & Claiming Workflow
+
+This sequence diagram illustrates the lifecycle of a food listing—from AI-enhanced listing creation by a donor, geospatial matching with watchlists, reservation claiming with Razorpay payment, real-time messaging, to physical QR handoff and impact audit.
 
 ```mermaid
 sequenceDiagram
@@ -226,7 +221,9 @@ sequenceDiagram
 
 ---
 
-### 4. Real-Time Messaging & Background Worker Subsystem
+## 4. Real-Time Messaging & Background Worker Subsystem
+
+Left2Serve combines WebSocket connection rooms via Socket.IO with BullMQ Redis-backed queues for scheduled and asynchronous workloads.
 
 ```mermaid
 flowchart TD
@@ -243,6 +240,12 @@ flowchart TD
         ConnHandler --> UserRoom
         ConnHandler --> ChatRoom
         ConnHandler --> FeedRoom
+    end
+
+    subgraph EventTriggers["📡 Event Dispatchers"]
+        MsgEvent["New Message Event"] --> ChatRoom
+        StatusEvent["Reservation Status Change"] --> UserRoom
+        ListingEvent["New Available Listing"] --> FeedRoom
     end
 
     subgraph BullMQTier["⚡ BullMQ Asynchronous Task Pipeline"]
@@ -280,7 +283,9 @@ flowchart TD
 
 ---
 
-### 5. Database Entity-Relationship Diagram (ERD)
+## 5. Database Entity-Relationship Diagram (ERD)
+
+This entity-relationship diagram shows the relational schema modeled in PostgreSQL via Prisma ORM, highlighting primary keys, foreign keys, and relational cardinality.
 
 ```mermaid
 erDiagram
@@ -309,23 +314,44 @@ erDiagram
         string email UK
         string password_hash
         string role
+        string phone
+        string address
+        string organization
         boolean is_active
         int token_version
-        int meals_saved
+        int failed_attempts
+        datetime locked_until
+        datetime created_at
+        string reset_token
+        datetime reset_expires
+        string two_factor_secret
+        boolean two_factor_enabled
+        string avatar_url
         json badges
+        int meals_saved
+        json push_subscriptions
     }
 
     FoodListing {
         int id PK
         int user_id FK
         string title
+        string description
         string category
         int quantity
+        string unit
         decimal price
         datetime expiry_date
+        string pickup_address
+        string pickup_instructions
+        json image_urls
+        json dietary_preferences
+        string status
+        datetime created_at
         decimal latitude
         decimal longitude
-        string status
+        boolean has_safety_checklist
+        boolean is_template
     }
 
     Reservation {
@@ -337,6 +363,13 @@ erDiagram
         string payment_method
         string payment_status
         decimal amount
+        string razorpay_order_id
+        string razorpay_payment_id
+        string razorpay_signature
+        datetime pickup_time
+        string notes
+        datetime created_at
+        boolean agreed_to_waiver
     }
 
     Review {
@@ -347,6 +380,7 @@ erDiagram
         int reviewee_id FK
         smallint rating
         string comment
+        datetime created_at
     }
 
     Message {
@@ -354,6 +388,7 @@ erDiagram
         int reservation_id FK
         int sender_id FK
         string content
+        datetime created_at
     }
 
     Notification {
@@ -362,7 +397,9 @@ erDiagram
         string type
         string title
         string message
+        json data
         boolean is_read
+        datetime created_at
     }
 
     Watchlist {
@@ -372,13 +409,16 @@ erDiagram
         decimal latitude
         decimal longitude
         decimal radius_km
+        datetime created_at
     }
 
     ForumCategory {
         int id PK
         string name
+        string description
         json read_roles
         json write_roles
+        datetime created_at
     }
 
     ForumPost {
@@ -387,6 +427,7 @@ erDiagram
         int user_id FK
         string title
         string content
+        datetime created_at
     }
 
     ForumReply {
@@ -394,6 +435,7 @@ erDiagram
         int post_id FK
         int user_id FK
         string content
+        datetime created_at
     }
 
     AuditLog {
@@ -408,108 +450,3 @@ erDiagram
         datetime created_at
     }
 ```
-
----
-
-### ⚙️ Backend Tech Stack (Node.js & Express)
-- **Database & ORM:** PostgreSQL powered by [Prisma](https://www.prisma.io/)
-- **Caching & Rate Limiting:** [Redis](https://redis.io/) (via `ioredis` & Upstash)
-- **Background Jobs:** [BullMQ](https://bullmq.io/) for async tasks (email dispatching, TTL purging, maintenance)
-- **API Layer:** REST and [tRPC](https://trpc.io/) for end-to-end type safety
-- **Real-Time Communication:** [Socket.IO](https://socket.io/) for chat channels & live notifications
-- **Observability:** [Sentry](https://sentry.io/) for APM and Node Profiling
-
-### 🖥️ Frontend Tech Stack (React Ecosystem)
-- **Modern SSR (Primary):** [Next.js 15](https://nextjs.org/) (Running on Port 3001)
-- **Legacy SPA:** Vite + React Router (Running on Port 3000)
-- **State Management:** [Zustand](https://zustand-demo.pmnd.rs/) (Client) + [TanStack Query](https://tanstack.com/query) (Server Cache)
-- **Styling:** Tailwind CSS v4
-
-
----
-
-## 📂 Project Structure
-
-```text
-Left2Serve/
-├── backend/            # Node.js/Express API, Prisma schema, Redis/BullMQ config
-├── frontend/           # Legacy Vite + React SPA
-├── frontend-next/      # Modern Next.js 15 SSR application
-├── .github/            # GitHub Actions CI/CD workflows
-├── docker-compose.yml  # Orchestration for local development
-└── README.md           # Project documentation
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- [Docker](https://www.docker.com/) & Docker Compose (Recommended)
-- [Node.js](https://nodejs.org/) (v18+ recommended)
-- PostgreSQL & Redis (if running manually)
-
-### Quick Start (Docker)
-
-The absolute easiest way to run the entire stack is using Docker Compose. This spins up the database, cache, backend, and both frontends.
-
-```bash
-docker-compose up --build
-```
-
-**Access the services:**
-- **Backend API:** `http://localhost:5000`
-- **Next.js (New SSR Pages):** `http://localhost:3001`
-- **Vite SPA (Legacy Dashboard):** `http://localhost:3000`
-- **PostgreSQL:** `localhost:5432`
-- **Redis:** `localhost:6379`
-
-### Manual Setup
-
-If you prefer to run the services individually without Docker:
-
-#### 1. Infrastructure
-Ensure PostgreSQL and Redis are running locally or via a cloud provider (e.g., Upstash). Configure your `.env` variables in `backend/.env`.
-
-#### 2. Backend
-```bash
-cd backend
-npm install
-npx prisma generate
-npm run dev
-```
-
-#### 3. Frontend (Modern Next.js)
-```bash
-cd frontend-next
-npm install
-npm run dev
-```
-
-#### 4. Frontend (Legacy Vite)
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
----
-
-## 🔒 CI/CD & Production
-
-This repository utilizes GitHub Actions (`.github/workflows/ci.yml`) to ensure code quality and reliability:
-- Automatically provisions ephemeral databases for testing.
-- Executes Prisma migrations safely.
-- Validates production builds for both backend and frontend applications on every Pull Request.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
