@@ -20,7 +20,7 @@ Title: ${title}
 Category: ${category}
 Keep it under 3 sentences, professional, and empathetic. Do not include quotes around the text.`;
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3.5-flash',
                 contents: prompt,
             });
             const text = response.text;
@@ -85,7 +85,7 @@ Keep it under 3 sentences, professional, and empathetic. Do not include quotes a
         let aiResponse;
         try {
             aiResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3.5-flash',
                 contents: [
                     {
                         role: 'user',
