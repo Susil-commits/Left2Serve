@@ -107,6 +107,13 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/watchlists', watchlistsRoutes);
 app.use('/api/forum', forumRoutes);
 app.use('/api/ai', aiRoutes);
+app.get('/', (req, res) => {
+    res.json({
+        name: 'Left2Serve API',
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+    });
+});
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/health/notifications', (req, res) => {
     res.json(getNotificationHealth());
