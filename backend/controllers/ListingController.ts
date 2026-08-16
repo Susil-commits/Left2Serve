@@ -40,7 +40,7 @@ export class ListingController {
   static async upload(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const urls: string[] = [];
-      const files = req.files as Express.Multer.File[];
+      const files = ((req as any).files || []) as Array<{ buffer: Buffer; [key: string]: any }>;
       for (const f of files) {
         const processedBuffer = await sharp(f.buffer)
           .rotate()
