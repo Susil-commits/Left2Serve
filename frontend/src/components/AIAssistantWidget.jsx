@@ -9,12 +9,11 @@ const STARTER_SUGGESTIONS = [
 ];
 
 /**
- * Simple, safe markdown parser for rendering assistant responses cleanly
+ * Simple markdown parser for rendering assistant responses cleanly
  */
 function FormattedMessage({ content }) {
   if (!content) return null;
 
-  // Split by newlines to handle paragraphs and bullet points
   const lines = content.split('\n');
 
   return (
@@ -23,7 +22,7 @@ function FormattedMessage({ content }) {
         const trimmed = line.trim();
         if (!trimmed) return <div key={idx} className="h-1" />;
 
-        // Bullet points (starts with '-' or '*')
+        // Bullet points
         const isBullet = /^[*-]\s+/.test(trimmed);
         const textContent = isBullet ? trimmed.replace(/^[*-]\s+/, '') : trimmed;
 
@@ -63,12 +62,10 @@ export default function AIAssistantWidget() {
       id: 'welcome',
       role: 'assistant',
       text: "Hey! 👋 I am **Jule**, your Left2Serve assistant. I'm here to help you with surplus food donations, safety guidelines, NGO reservations, and platform navigation.\n\nHow can I help you today?",
-      guardrailTriggered: false,
     },
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showGuardrailInfo, setShowGuardrailInfo] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -112,10 +109,6 @@ export default function AIAssistantWidget() {
         id: String(Date.now() + 1),
         role: 'assistant',
         text: res.text || 'I apologize, no response could be generated at this moment.',
-        guardrailTriggered: Boolean(res.guardrailTriggered),
-        category: res.category,
-        reason: res.reason,
-        sanitized: res.sanitized,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -147,7 +140,7 @@ export default function AIAssistantWidget() {
       {
         id: 'welcome',
         role: 'assistant',
-        text: "Chat cleared! ✨ I'm **Jule**, your AI assistant. How can I help you with Left2Serve today?",
+        text: "Chat cleared! ✨ I'm **Jule**, your AI assistant. How can I help you today?",
       },
     ]);
   };
@@ -242,19 +235,13 @@ export default function AIAssistantWidget() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-sm sm:text-base tracking-tight text-white flex items-center gap-1.5">
-                    Jule <span className="text-xs font-normal text-rose-100 bg-white/15 px-2 py-0.5 rounded-full">AI Assistant</span>
+                    Jule <span className="text-xs font-normal text-rose-100 bg-white/15 px-2 py-0.5 rounded-full">Assistant</span>
                   </h3>
                 </div>
-                <button
-                  onClick={() => setShowGuardrailInfo(!showGuardrailInfo)}
-                  className="flex items-center gap-1 text-[11px] text-rose-100 hover:text-white bg-white/15 hover:bg-white/25 px-2 py-0.5 rounded-full transition-all mt-0.5 cursor-pointer"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
-                  <span>Safety Guardrails Active</span>
-                  <svg className="w-3 h-3 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-1.5 text-[11px] text-rose-100/90 mt-0.5 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                  <span>Online • Ready to help</span>
+                </div>
               </div>
             </div>
 
@@ -283,43 +270,6 @@ export default function AIAssistantWidget() {
             </div>
           </div>
 
-          {/* Guardrails Info Popover Panel */}
-          {showGuardrailInfo && (
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-slate-800/90 dark:to-amber-950/30 border-b border-amber-200/80 dark:border-amber-900/50 p-3.5 text-xs text-amber-950 dark:text-amber-200 transition-all flex items-start gap-2.5 animate-fadeIn shadow-sm">
-              <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 font-bold text-xs mt-0.5">
-                🛡️
-              </div>
-              <div className="flex-1 space-y-1.5">
-                <p className="font-semibold text-amber-900 dark:text-amber-300">Multi-Tier Security Active:</p>
-                <div className="grid grid-cols-2 gap-1.5 text-[11px] opacity-90">
-                  <div className="bg-white/70 dark:bg-slate-900/60 p-1.5 rounded-lg border border-amber-200/60 dark:border-amber-900/40">
-                    <span className="font-medium text-amber-800 dark:text-amber-200">🔒 PII Masking</span>
-                    <p className="text-[10px] text-amber-700 dark:text-amber-400">Redacts phone, email, card data</p>
-                  </div>
-                  <div className="bg-white/70 dark:bg-slate-900/60 p-1.5 rounded-lg border border-amber-200/60 dark:border-amber-900/40">
-                    <span className="font-medium text-amber-800 dark:text-amber-200">⚡ Injection Filter</span>
-                    <p className="text-[10px] text-amber-700 dark:text-amber-400">Blocks prompt hacking & jailbreaks</p>
-                  </div>
-                  <div className="bg-white/70 dark:bg-slate-900/60 p-1.5 rounded-lg border border-amber-200/60 dark:border-amber-900/40">
-                    <span className="font-medium text-amber-800 dark:text-amber-200">🔑 Secret Shield</span>
-                    <p className="text-[10px] text-amber-700 dark:text-amber-400">Prevents credential & key leaks</p>
-                  </div>
-                  <div className="bg-white/70 dark:bg-slate-900/60 p-1.5 rounded-lg border border-amber-200/60 dark:border-amber-900/40">
-                    <span className="font-medium text-amber-800 dark:text-amber-200">🍲 Domain Scope</span>
-                    <p className="text-[10px] text-amber-700 dark:text-amber-400">Food rescue & safety focus</p>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowGuardrailInfo(false)}
-                className="text-amber-700 dark:text-amber-400 hover:opacity-75 font-bold p-1"
-                aria-label="Close security info"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
           {/* Messages Feed */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/60 dark:bg-slate-950/40">
             {messages.map((m) => {
@@ -346,20 +296,6 @@ export default function AIAssistantWidget() {
                     >
                       <FormattedMessage content={m.text} />
                     </div>
-
-                    {/* Guardrail badges */}
-                    {!isUser && m.guardrailTriggered && (
-                      <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-md font-medium">
-                        <span>🛡️ Intercepted by Safety Guardrail</span>
-                        {m.category && <span className="opacity-75">({m.category})</span>}
-                      </div>
-                    )}
-
-                    {!isUser && m.sanitized && (
-                      <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900/50 px-2 py-0.5 rounded-md font-medium">
-                        <span>🔒 PII Anonymized</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
@@ -377,7 +313,7 @@ export default function AIAssistantWidget() {
                     <span className="w-2 h-2 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '150ms' }} />
                     <span className="w-2 h-2 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Jule is thinking...</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Jule is typing...</span>
                 </div>
               </div>
             )}
@@ -432,11 +368,7 @@ export default function AIAssistantWidget() {
             </div>
 
             <div className="flex justify-between items-center px-1 text-[10px] text-slate-400 dark:text-slate-500">
-              <span className="flex items-center gap-1">
-                <span>🛡️ Guardrail Protected</span>
-                <span>•</span>
-                <span>Gemini AI</span>
-              </span>
+              <span>Left2Serve Assistant</span>
               <span>{inputText.length}/2000</span>
             </div>
           </div>
