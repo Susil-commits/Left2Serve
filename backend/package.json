@@ -6,8 +6,8 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "prisma generate && node dist/server.js",
-    "start:prod": "cross-env NODE_ENV=production prisma generate && node dist/server.js",
+    "start": "prisma generate && tsc && node dist/server.js",
+    "start:prod": "cross-env NODE_ENV=production prisma generate && tsc && node dist/server.js",
     "dev": "tsx watch server.ts",
     "build": "prisma generate && tsc",
     "test": "vitest run"
