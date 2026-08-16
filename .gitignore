@@ -10,6 +10,8 @@ node_modules/
 
 # Build outputs
 frontend/dist/
+backend/dist/
+dist/
 backend/uploads/
 
 # Logs

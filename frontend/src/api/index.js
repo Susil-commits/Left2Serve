@@ -71,6 +71,10 @@ export const api = {
   chat: {
     getHistory: (reservationId) => request(`/chat/${reservationId}`),
   },
+  ai: {
+    chat: (body) => request('/ai/chat', { method: 'POST', body }),
+    describe: (body) => request('/ai/describe', { method: 'POST', body }),
+  },
   payments: {
     config: () => request('/payments/config', { method: 'POST' }),
     createOrder: (body) => request('/payments/create-order', { method: 'POST', body }),
