@@ -50,8 +50,8 @@ GUARDRAILS & BEHAVIOR CONSTRAINTS:
 
 // Input Guardrails
 var injectionPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)ignore\s+(all\s+)?(previous|prior|above)\s+instructions`),
-	regexp.MustCompile(`(?i)disregard\s+(all\s+)?(previous|prior|system)\s+(instructions|rules|prompts)`),
+	regexp.MustCompile(`(?i)ignore\s+(all\s+)?(previous|prior|above|system|\s+)*(instructions|rules|prompts)`),
+	regexp.MustCompile(`(?i)disregard\s+(all\s+)?(previous|prior|system|\s+)*(instructions|rules|prompts)`),
 	regexp.MustCompile(`(?i)you\s+are\s+now\s+(in\s+)?(developer\s+mode|dan\s+mode|unrestricted|god\s+mode)`),
 	regexp.MustCompile(`(?i)bypass\s+(all\s+)?(safety|content|security)\s+filters`),
 	regexp.MustCompile(`(?i)system\s+override`),
