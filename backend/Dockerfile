@@ -1,32 +1,37 @@
-FROM node:20-alpine AS builder
+# Multi-stage Go build
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm ci
+# Install ca-certificates and git (if needed for modules)
+RUN apk add --no-cache ca-certificates git
 
-# Copy source
+# Cache Go modules
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
 COPY . .
 
-# Build TypeScript
-RUN npm run build
+# Compile optimized static binary
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./cmd/server
 
-# Production stage
-FROM node:20-alpine
+# Minimal production image
+FROM alpine:latest
 
 WORKDIR /app
 
-# Copy package info and production dependencies
-COPY package*.json ./
-RUN npm ci --only=production
+# Add runtime certificates and timezone data
+RUN apk add --no-cache ca-certificates tzdata
 
-# Copy built artifacts
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+# Copy compiled binary from builder
+COPY --from=builder /app/server .
 
-# Expose port
+# Ensure uploads directory structure exists
+RUN mkdir -p uploads/left2serve
+
+# Expose default backend port
 EXPOSE 5000
 
-# Start server
-CMD ["npm", "start"]
+# Start Go backend server
+CMD ["./server"]

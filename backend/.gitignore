@@ -4,3 +4,6 @@ dist/
 *.db
 uploads/
 /generated/prisma
+/server
+/server.exe
+*.exe
