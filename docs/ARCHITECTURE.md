@@ -15,7 +15,7 @@ This document details the software architecture, system components, data models,
 
 ## 1. High-Level System & Component Architecture
 
-Left2Serve is structured as a cloud-native, decoupled platform featuring dual client frontends, an Express + tRPC API backend, relational and in-memory databases, asynchronous background workers, and third-party integrations.
+Left2Serve is structured as a cloud-native, decoupled platform featuring dual client frontends, a high-performance Go (Gin) + tRPC compatibility backend, PostgreSQL database, in-memory/Redis caching, concurrent goroutine background workers, and third-party integrations.
 
 ```mermaid
 flowchart TB
@@ -41,23 +41,23 @@ flowchart TB
 
     %% Security & Gateway
     subgraph Gateway["🛡️ Security & API Gateway Layer"]
-        Helmet["Helmet (CSP, HSTS)"]
+        SecurityHeaders["Security Headers Middleware"]
         Cors["Dynamic CORS Guard"]
         RateLimit["Rate Limiters (API, Auth, AI)"]
-        XSS["XSS Sanitization Middleware"]
+        RequestID["Request ID Tracing"]
         AuthMiddleware["JWT + RBAC + 2FA Auth"]
     end
 
-    NextApp --> Helmet
-    ViteApp --> Helmet
-    Helmet --> Cors --> RateLimit --> XSS --> AuthMiddleware
+    NextApp --> SecurityHeaders
+    ViteApp --> SecurityHeaders
+    SecurityHeaders --> Cors --> RateLimit --> RequestID --> AuthMiddleware
 
     %% Backend Services
-    subgraph Backend["⚙️ Backend Core (Node.js & Express :5000)"]
-        RestAPI["REST API Routes\n(/api/auth, /api/listings, /api/reservations, /api/forum)"]
-        TRPCRouter["tRPC Router\n(Type-safe procedures)"]
-        SocketServer["Socket.IO Server\n(Real-time chat & notifications)"]
-        CronManager["BullMQ Schedulers\n(Repeatable Cron Sweepers)"]
+    subgraph Backend["⚙️ Backend Core (Go 1.24 & Gin :5000)"]
+        RestAPI["REST API Handlers\n(/api/auth, /api/listings, /api/reservations, /api/forum, /api/ai)"]
+        TRPCRouter["tRPC Compatibility Layer\n(/trpc/* Handlers)"]
+        SocketServer["Socket.IO v4 Server (Go)\n(Real-time chat & notifications)"]
+        CronManager["Native Go Background Scheduler\n(Repeatable Cron Sweepers)"]
     end
 
     AuthMiddleware --> RestAPI
@@ -66,27 +66,27 @@ flowchart TB
 
     %% Storage & Cache
     subgraph Persistence["💾 Data & Cache Layer"]
-        Postgres[(PostgreSQL Database\nManaged by Prisma ORM)]
-        RedisCache[(Redis / Upstash\nCache & Rate Limit Store)]
-        BullQueue[(BullMQ Queue\n'background-jobs')]
+        Postgres[(PostgreSQL Database\nManaged via Go database/sql & lib/pq)]
+        RedisCache[(Redis Store\nCache & Rate Limit Store)]
+        SchedulerQueue[(Go Concurrent Cron Scheduler\n'background-jobs')]
     end
 
     RestAPI --> Postgres
     TRPCRouter --> Postgres
     RestAPI --> RedisCache
-    CronManager --> BullQueue
+    CronManager --> SchedulerQueue
 
     %% Workers
-    subgraph Workers["⚡ Async Background Workers"]
-        Worker["BullMQ Worker Instance\n(TTL Sweeper, Daily Maintenance, Email Sender)"]
+    subgraph Workers["⚡ Async Background Routines"]
+        Worker["Go Goroutine Sweepers\n(TTL Sweeper, Daily Maintenance, Email Sender)"]
     end
 
-    BullQueue --> Worker
+    SchedulerQueue --> Worker
     Worker --> Postgres
 
     %% External Services
     subgraph External["☁️ External Services & Integrations"]
-        Gemini["Google Gemini AI\n(Smart Listing Descriptions)"]
+        Gemini["Google Gemini AI\n(Smart Listing Descriptions & Guardrails)"]
         Razorpay["Razorpay Gateway\n(Payment & Order Verification)"]
         Cloudinary["Cloudinary CDN\n(Image Asset Storage)"]
         Sentry["Sentry APM\n(Profiling & Error Tracing)"]
@@ -158,11 +158,11 @@ sequenceDiagram
     actor Donor as 🍲 Food Donor
     actor Recipient as 🏢 Recipient / NGO
     participant Client as 🖥️ Frontend Client
-    participant API as ⚙️ Express Backend
+    participant API as ⚙️ Go Backend (Gin)
     participant AI as 🤖 Gemini AI
-    participant DB as 🐘 PostgreSQL (Prisma)
-    participant Redis as ⚡ Redis / BullMQ
-    participant Socket as 🔌 Socket.IO Server
+    participant DB as 🐘 PostgreSQL
+    participant Redis as ⚡ Redis Cache
+    participant Socket as 🔌 Socket.IO v4 (Go)
     participant Pay as 💳 Razorpay Gateway
 
     %% Phase 1: Listing Creation
@@ -223,11 +223,11 @@ sequenceDiagram
 
 ## 4. Real-Time Messaging & Background Worker Subsystem
 
-Left2Serve combines WebSocket connection rooms via Socket.IO with BullMQ Redis-backed queues for scheduled and asynchronous workloads.
+Left2Serve combines WebSocket connection rooms via Socket.IO v4 with Go native cron schedulers and concurrent worker goroutines for scheduled and asynchronous workloads.
 
 ```mermaid
 flowchart TD
-    subgraph WebSocketTier["🔌 Socket.IO Real-Time Channels"]
+    subgraph WebSocketTier["🔌 Socket.IO v4 (Go) Real-Time Channels"]
         direction TB
         ConnHandler["Socket Connection Handler\n(JWT Authentication Handshake)"]
         
@@ -248,34 +248,28 @@ flowchart TD
         ListingEvent["New Available Listing"] --> FeedRoom
     end
 
-    subgraph BullMQTier["⚡ BullMQ Asynchronous Task Pipeline"]
+    subgraph GoWorkerTier["⚡ Go Concurrent Scheduler & Worker Pipeline"]
         direction TB
-        BQueue[("BullMQ Queue: 'background-jobs'\n(Powered by Redis / Upstash)")]
+        Scheduler["Go Native Cron Job Manager\n(robfig/cron & goroutines)"]
 
-        subgraph Schedulers["Repeatable Job Schedulers"]
-            Cron5Min["sweep-expired-scheduler\n(Pattern: '*/5 * * * *')"]
-            CronMidnight["daily-maintenance-scheduler\n(Pattern: '0 0 * * *')"]
+        subgraph Schedulers["Scheduled Sweeper Routines"]
+            Cron5Min["sweep-expired-routine\n(Runs every 5 minutes)"]
+            CronMidnight["daily-maintenance-routine\n(Runs daily at midnight)"]
         end
 
-        Cron5Min -->|Push Job| BQueue
-        CronMidnight -->|Push Job| BQueue
-        APIWorkerReq["Ad-hoc Tasks (e.g., 'send-email')"] -->|Push Job| BQueue
+        Scheduler --> Cron5Min
+        Scheduler --> CronMidnight
 
-        subgraph WorkerProcess["BullMQ Worker Engine"]
-            WorkerLoop["Worker Process Loop"]
-            JobRouter{"Job Name Router"}
-            
-            Task1["Job: 'sweep-expired'\n• Query listings WHERE expiry_date < NOW()\n• UPDATE status = 'expired'"]
-            Task2["Job: 'daily-maintenance'\n• Purge read notifications > 30 days\n• Auto-cancel orphaned reservations"]
-            Task3["Job: 'send-email'\n• SMTP dispatch for confirmations & alerts"]
+        subgraph WorkerProcess["Worker Execution Engine"]
+            Task1["Routine: 'SweepExpiredListings'\n• Query listings WHERE expiry_date < NOW() AND status = 'available'\n• UPDATE status = 'expired'"]
+            Task2["Routine: 'DailyMaintenance'\n• Purge notifications older than 30 days\n• Auto-cancel orphaned reservations"]
+            Task3["Routine: 'SendEmailAsync'\n• SMTP goroutine dispatch for receipts & alerts"]
 
-            WorkerLoop --> JobRouter
-            JobRouter -->|"sweep-expired"| Task1
-            JobRouter -->|"daily-maintenance"| Task2
-            JobRouter -->|"send-email"| Task3
+            Cron5Min --> Task1
+            CronMidnight --> Task2
+            APIWorkerReq["Ad-hoc Tasks (e.g., SMTP dispatch)"] --> Task3
         end
 
-        BQueue --> WorkerLoop
         Task1 --> DBTarget[(PostgreSQL Database)]
         Task2 --> DBTarget
     end
@@ -285,7 +279,7 @@ flowchart TD
 
 ## 5. Database Entity-Relationship Diagram (ERD)
 
-This entity-relationship diagram shows the relational schema modeled in PostgreSQL via Prisma ORM, highlighting primary keys, foreign keys, and relational cardinality.
+This entity-relationship diagram shows the relational schema modeled in PostgreSQL with automatic table and column migrations on startup, highlighting primary keys, foreign keys, and relational cardinality.
 
 ```mermaid
 erDiagram
