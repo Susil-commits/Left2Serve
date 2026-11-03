@@ -58,6 +58,11 @@ func InitRedis(cfg *config.Config) {
 	log.Println("Connected to Redis successfully")
 }
 
+// GetRedisClient returns the global Redis client instance, or nil if Redis is not configured.
+func GetRedisClient() *redis.Client {
+	return redisClient
+}
+
 func CacheGet(key string) (string, bool) {
 	if redisClient != nil {
 		val, err := redisClient.Get(ctx, key).Result()

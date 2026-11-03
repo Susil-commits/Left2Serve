@@ -41,10 +41,10 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		r.Any("/socket.io", sockets.GlobalSocketServer.HandleSocketIO)
 	}
 
-	// Rate limiters
-	apiLimiter := middleware.NewRateLimiter(300, 15*time.Minute)
-	authLimiter := middleware.NewRateLimiter(20, 15*time.Minute)
-	aiLimiter := middleware.NewRateLimiter(10, 1*time.Minute)
+	// Rate limiters (distributed with Redis, in-memory fallback)
+	apiLimiter := middleware.NewRateLimiterWithPrefix("api", 300, 15*time.Minute)
+	authLimiter := middleware.NewRateLimiterWithPrefix("auth", 20, 15*time.Minute)
+	aiLimiter := middleware.NewRateLimiterWithPrefix("ai", 10, 1*time.Minute)
 
 	api := r.Group("/api")
 	api.Use(apiLimiter.Middleware("Too many requests, please try again later"))

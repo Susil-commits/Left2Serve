@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"left2serve/backend/database"
+	"left2serve/backend/jobs"
 	"left2serve/backend/models"
 	"left2serve/backend/sockets"
 	"left2serve/backend/utils"
@@ -249,41 +250,21 @@ func (s *ListingService) CreateListing(ctx context.Context, userID int, req *mod
 		return nil, err
 	}
 
-	// Trigger smart alerts for matching watchlists
-	if req.Latitude != nil && req.Longitude != nil && !req.IsTemplate {
-		go func() {
-			bgCtx := context.Background()
-			desc := ""
-			if req.Description != nil {
-				desc = *req.Description
-			}
-			searchStr := fmt.Sprintf("%s %s %s", req.Title, desc, req.Category)
-
-			rows, err := database.DB.QueryContext(bgCtx, `
-				SELECT user_id, keyword FROM watchlists 
-				WHERE user_id != $1 
-				  AND (keyword IS NULL OR keyword = '' OR $2 ILIKE '%' || keyword || '%')
-				  AND ( 6371 * acos(LEAST(1.0, GREATEST(-1.0, cos(radians($3)) * cos(radians(latitude)) * cos(radians(longitude) - radians($4)) + sin(radians($5)) * sin(radians(latitude))))) ) <= radius_km`,
-				userID, searchStr, *req.Latitude, *req.Longitude, *req.Latitude,
-			)
-			if err == nil {
-				defer rows.Close()
-				for rows.Next() {
-					var watcherID int
-					var kw sql.NullString
-					if err := rows.Scan(&watcherID, &kw); err == nil {
-						_ = GlobalNotificationService.CreateNotification(
-							bgCtx,
-							watcherID,
-							"watchlist_alert",
-							"New Food Alert!",
-							fmt.Sprintf("A new listing \"%s\" matches your watchlist criteria!", req.Title),
-							map[string]any{"listingId": newID, "keyword": kw.String},
-						)
-					}
-				}
-			}
-		}()
+	// Trigger smart alerts for matching watchlists via asynchronous task queue
+	if req.Latitude != nil && req.Longitude != nil && !req.IsTemplate && jobs.GlobalTaskQueue != nil {
+		desc := ""
+		if req.Description != nil {
+			desc = *req.Description
+		}
+		jobs.GlobalTaskQueue.EnqueueWatchlistMatch(jobs.WatchlistMatchTask{
+			ListingID:   newID,
+			UserID:      userID,
+			Title:       req.Title,
+			Description: desc,
+			Category:    req.Category,
+			Latitude:    *req.Latitude,
+			Longitude:   *req.Longitude,
+		})
 	}
 
 	if sockets.GlobalSocketServer != nil {

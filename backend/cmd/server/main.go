@@ -82,7 +82,13 @@ func main() {
 	controllers.InitPaymentController(cfg)
 	controllers.InitAdminController(cfg)
 
-	// 9. Start Background Cron Jobs
+	// 9. Start Background Cron Jobs & Worker Task Queue
+	jobs.RegisterNotificationDispatcher(func(ctx context.Context, userID int, notifType, title, message string, data map[string]any) error {
+		return services.GlobalNotificationService.CreateNotification(ctx, userID, notifType, title, message, data)
+	})
+	taskQueue := jobs.InitTaskQueue(4, 1000)
+	defer taskQueue.Stop()
+
 	cronManager := jobs.SetupBackgroundJobs()
 	defer cronManager.Stop()
 

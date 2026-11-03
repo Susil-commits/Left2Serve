@@ -242,10 +242,28 @@ func Initialize(ctx context.Context, db *sql.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_forum_posts_category ON forum_posts(category_id)",
 		"CREATE INDEX IF NOT EXISTS idx_forum_replies_post ON forum_replies(post_id)",
 		"CREATE INDEX IF NOT EXISTS idx_food_listings_search ON food_listings USING GIN (to_tsvector('english', title || ' ' || COALESCE(description, '') || ' ' || category))",
+		"CREATE INDEX IF NOT EXISTS idx_food_listings_lat_lng ON food_listings(latitude, longitude) WHERE latitude IS NOT NULL AND longitude IS NOT NULL",
+		"CREATE INDEX IF NOT EXISTS idx_watchlists_lat_lng ON watchlists(latitude, longitude)",
 	}
 
 	for _, idx := range indexes {
 		_, _ = db.ExecContext(ctx, idx)
+	}
+
+	// Detect and initialize PostGIS spatial extensions if supported by host PostgreSQL instance
+	var postgisAvailable bool
+	_ = db.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'postgis')").Scan(&postgisAvailable)
+	if postgisAvailable {
+		_, err := db.ExecContext(ctx, "CREATE EXTENSION IF NOT EXISTS postgis")
+		if err == nil {
+			var postgisInstalled bool
+			_ = db.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis')").Scan(&postgisInstalled)
+			if postgisInstalled {
+				log.Println("PostGIS extension active - initializing spatial GiST indexes")
+				_, _ = db.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS idx_food_listings_geom ON food_listings USING GIST (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography) WHERE latitude IS NOT NULL AND longitude IS NOT NULL")
+				_, _ = db.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS idx_watchlists_geom ON watchlists USING GIST (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography)")
+			}
+		}
 	}
 
 	log.Println("PostgreSQL database tables and indexes initialized successfully")

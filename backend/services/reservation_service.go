@@ -48,7 +48,7 @@ func (s *ReservationService) CreateReservation(ctx context.Context, userID int, 
 			return utils.BadRequest("This listing has expired")
 		}
 
-		avail, err := database.GetAvailability(ctx, req.FoodListingID)
+		avail, err := database.GetAvailabilityTx(ctx, tx, req.FoodListingID)
 		if err != nil {
 			return err
 		}
@@ -85,7 +85,7 @@ func (s *ReservationService) CreateReservation(ctx context.Context, userID int, 
 			return err
 		}
 
-		_ = database.RecomputeListingStatus(ctx, req.FoodListingID)
+		_ = database.RecomputeListingStatusTx(ctx, tx, req.FoodListingID)
 
 		err = tx.QueryRowContext(ctx, `
 			SELECT id, food_listing_id, user_id, quantity, status, payment_method, payment_status, 

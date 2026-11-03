@@ -1,6 +1,7 @@
 package sockets
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,9 +13,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 	"left2serve/backend/config"
 	"left2serve/backend/database"
 	"left2serve/backend/middleware"
+	"left2serve/backend/utils"
 )
 
 var upgrader = websocket.Upgrader{
@@ -38,6 +41,7 @@ type SocketClient struct {
 
 type SocketServer struct {
 	cfg     *config.Config
+	nodeID  string
 	clients map[string]*SocketClient
 	rooms   map[string]map[string]*SocketClient
 	mu      sync.RWMutex
@@ -45,14 +49,56 @@ type SocketServer struct {
 
 var GlobalSocketServer *SocketServer
 
+type redisBroadcastMessage struct {
+	SenderNodeID string          `json:"sender_node_id"`
+	Room         string          `json:"room,omitempty"`
+	Event        string          `json:"event"`
+	Payload      json.RawMessage `json:"payload"`
+}
+
 func InitSocketServer(cfg *config.Config) *SocketServer {
 	srv := &SocketServer{
 		cfg:     cfg,
+		nodeID:  uuid.New().String(),
 		clients: make(map[string]*SocketClient),
 		rooms:   make(map[string]map[string]*SocketClient),
 	}
 	GlobalSocketServer = srv
+
+	// Start Redis cluster pub/sub listener if Redis client is available
+	rdb := utils.GetRedisClient()
+	if rdb != nil {
+		go srv.listenRedisPubSub(rdb)
+	}
+
 	return srv
+}
+
+func (s *SocketServer) listenRedisPubSub(rdb *redis.Client) {
+	ctx := context.Background()
+	pubsub := rdb.Subscribe(ctx, "left2serve:socket:broadcast")
+	defer pubsub.Close()
+
+	ch := pubsub.Channel()
+	log.Printf("Socket.IO: Subscribed to Redis cluster broadcast (Node ID: %s)\n", s.nodeID)
+
+	for msg := range ch {
+		var rm redisBroadcastMessage
+		if err := json.Unmarshal([]byte(msg.Payload), &rm); err != nil {
+			continue
+		}
+
+		// Skip messages originating from this exact node (already delivered locally)
+		if rm.SenderNodeID == s.nodeID {
+			continue
+		}
+
+		if rm.Room != "" {
+			s.emitToRoomLocal(rm.Room, rm.Event, rm.Payload)
+		} else {
+			s.emitAllLocal(rm.Event, rm.Payload)
+		}
+	}
 }
 
 func (s *SocketServer) RegisterClient(client *SocketClient) {
@@ -90,14 +136,20 @@ func (s *SocketServer) JoinRoom(client *SocketClient, room string) {
 	s.rooms[room][client.ID] = client
 }
 
-func (s *SocketServer) EmitToRoom(room, event string, payload any) {
+func (s *SocketServer) emitToRoomLocal(room, event string, payload any) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	clients := s.rooms[room]
-	if len(clients) == 0 {
+	clientsMap := s.rooms[room]
+	if len(clientsMap) == 0 {
+		s.mu.RUnlock()
 		return
 	}
+
+	// Snapshot client pointers to release read lock before I/O
+	targets := make([]*SocketClient, 0, len(clientsMap))
+	for _, c := range clientsMap {
+		targets = append(targets, c)
+	}
+	s.mu.RUnlock()
 
 	raw, err := json.Marshal([]any{event, payload})
 	if err != nil {
@@ -105,8 +157,57 @@ func (s *SocketServer) EmitToRoom(room, event string, payload any) {
 	}
 	msg := "42" + string(raw)
 
-	for _, c := range clients {
+	for _, c := range targets {
 		c.SendMessage(msg)
+	}
+}
+
+func (s *SocketServer) emitAllLocal(event string, payload any) {
+	s.mu.RLock()
+	if len(s.clients) == 0 {
+		s.mu.RUnlock()
+		return
+	}
+
+	targets := make([]*SocketClient, 0, len(s.clients))
+	for _, c := range s.clients {
+		targets = append(targets, c)
+	}
+	s.mu.RUnlock()
+
+	raw, err := json.Marshal([]any{event, payload})
+	if err != nil {
+		return
+	}
+	msg := "42" + string(raw)
+
+	for _, c := range targets {
+		c.SendMessage(msg)
+	}
+}
+
+func (s *SocketServer) EmitToRoom(room, event string, payload any) {
+	// 1. Deliver immediately to local clients
+	s.emitToRoomLocal(room, event, payload)
+
+	// 2. Publish to cluster via Redis Pub/Sub if active
+	rdb := utils.GetRedisClient()
+	if rdb != nil {
+		payloadBytes, err := json.Marshal(payload)
+		if err != nil {
+			return
+		}
+
+		rm := redisBroadcastMessage{
+			SenderNodeID: s.nodeID,
+			Room:         room,
+			Event:        event,
+			Payload:      payloadBytes,
+		}
+		rawMsg, err := json.Marshal(rm)
+		if err == nil {
+			_ = rdb.Publish(context.Background(), "left2serve:socket:broadcast", rawMsg).Err()
+		}
 	}
 }
 
@@ -115,17 +216,27 @@ func (s *SocketServer) EmitToUser(userID int, event string, payload any) {
 }
 
 func (s *SocketServer) EmitAll(event string, payload any) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	// 1. Deliver immediately to local clients
+	s.emitAllLocal(event, payload)
 
-	raw, err := json.Marshal([]any{event, payload})
-	if err != nil {
-		return
-	}
-	msg := "42" + string(raw)
+	// 2. Publish to cluster via Redis Pub/Sub if active
+	rdb := utils.GetRedisClient()
+	if rdb != nil {
+		payloadBytes, err := json.Marshal(payload)
+		if err != nil {
+			return
+		}
 
-	for _, c := range s.clients {
-		c.SendMessage(msg)
+		rm := redisBroadcastMessage{
+			SenderNodeID: s.nodeID,
+			Room:         "",
+			Event:        event,
+			Payload:      payloadBytes,
+		}
+		rawMsg, err := json.Marshal(rm)
+		if err == nil {
+			_ = rdb.Publish(context.Background(), "left2serve:socket:broadcast", rawMsg).Err()
+		}
 	}
 }
 
