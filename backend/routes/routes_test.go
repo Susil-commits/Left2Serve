@@ -95,6 +95,21 @@ func TestRoutes(t *testing.T) {
 		}
 	})
 
+	t.Run("Metrics Prometheus endpoint", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/metrics", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", w.Code)
+		}
+
+		body := w.Body.String()
+		if len(body) == 0 {
+			t.Error("Expected non-empty Prometheus metrics output")
+		}
+	})
+
 	t.Run("404 Not Found", func(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, "/non-existent-route", nil)
 		w := httptest.NewRecorder()

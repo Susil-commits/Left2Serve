@@ -101,6 +101,12 @@ func (s *SocketServer) listenRedisPubSub(rdb *redis.Client) {
 	}
 }
 
+func (s *SocketServer) ClientCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.clients)
+}
+
 func (s *SocketServer) RegisterClient(client *SocketClient) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

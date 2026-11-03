@@ -188,6 +188,13 @@ func (q *TaskQueue) processWatchlistMatch(task WatchlistMatchTask) {
 	}
 }
 
+func (q *TaskQueue) QueueDepth() int {
+	if q == nil || q.tasks == nil {
+		return 0
+	}
+	return len(q.tasks)
+}
+
 func (q *TaskQueue) Stop() {
 	q.mu.Lock()
 	if q.isShutdown {

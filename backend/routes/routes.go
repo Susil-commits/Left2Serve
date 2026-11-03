@@ -24,6 +24,9 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	r.Use(middleware.RequestIDMiddleware())
 	r.Use(middleware.SecurityHeadersMiddleware())
 
+	// Metrics & Tracing middleware
+	r.Use(middleware.MetricsMiddleware())
+
 	// Static files for uploads
 	r.Static("/uploads", "./uploads")
 
@@ -31,6 +34,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	r.GET("/", controllers.GlobalHealthController.Root)
 	r.GET("/api/health", controllers.GlobalHealthController.Health)
 	r.GET("/api/health/notifications", controllers.GlobalHealthController.NotificationsHealth)
+	r.GET("/metrics", controllers.GlobalHealthController.Metrics)
 
 	// tRPC Compatibility
 	r.Any("/trpc/*any", controllers.GlobalHealthController.TRPCCompat)

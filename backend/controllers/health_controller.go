@@ -5,6 +5,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"left2serve/backend/database"
+	"left2serve/backend/jobs"
+	"left2serve/backend/middleware"
+	"left2serve/backend/sockets"
 )
 
 type HealthController struct{}
@@ -29,6 +33,27 @@ func (ctl *HealthController) NotificationsHealth(c *gin.Context) {
 		"consecutiveFailures": 0,
 		"lastStateChange":     time.Now().UTC().Format(time.RFC3339),
 	})
+}
+
+func (ctl *HealthController) Metrics(c *gin.Context) {
+	var wsCount, queueDepth int
+	if sockets.GlobalSocketServer != nil {
+		wsCount = sockets.GlobalSocketServer.ClientCount()
+	}
+	if jobs.GlobalTaskQueue != nil {
+		queueDepth = jobs.GlobalTaskQueue.QueueDepth()
+	}
+
+	dbStatsFn := func() (int, int, int, int64) {
+		if database.DB != nil {
+			st := database.DB.Stats()
+			return st.OpenConnections, st.InUse, st.Idle, st.WaitCount
+		}
+		return 0, 0, 0, 0
+	}
+
+	out := middleware.GlobalMetricsCollector.ExportPrometheus(dbStatsFn, wsCount, queueDepth)
+	c.Data(http.StatusOK, "text/plain; version=0.0.4; charset=utf-8", []byte(out))
 }
 
 func (ctl *HealthController) TRPCCompat(c *gin.Context) {

@@ -39,12 +39,12 @@ export function Navbar() {
           >
             Sign In
           </a>
-          <a
-            href={`${spaUrl}/donor/create`}
+          <Link
+            href="/donor/create"
             className="text-sm font-semibold bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl shadow-sm transition-all transform hover:-translate-y-0.5"
           >
             Donate Food
-          </a>
+          </Link>
         </div>
       </div>
     </header>
