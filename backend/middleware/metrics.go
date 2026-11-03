@@ -73,3 +73,4 @@ func (m *MetricsCollector) ExportPrometheus(dbStatsFn func() (int, int, int, int
 
 	return sb.String()
 }
+

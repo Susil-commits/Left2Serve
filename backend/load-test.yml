@@ -1,22 +1,54 @@
 config:
-  target: "https://left2serve.onrender.com"
+  target: "http://localhost:5000"
   phases:
-    - duration: 30
-      arrivalRate: 50
-      name: "Phase 1: 50 VUs"
+    - duration: 20
+      arrivalRate: 20
+      name: "Phase 1: Warm-up (20 VUs)"
     - duration: 30
       arrivalRate: 100
-      name: "Phase 2: 100 VUs"
+      rampTo: 250
+      name: "Phase 2: Ramping Load (100 - 250 VUs)"
+    - duration: 45
+      arrivalRate: 500
+      name: "Phase 3: Peak Surge Load (500 VUs)"
     - duration: 30
-      arrivalRate: 200
-      name: "Phase 3: 200 VUs"
+      arrivalRate: 1000
+      name: "Phase 4: Flash Claim Extreme Burst (1000 VUs)"
   environments:
+    local:
+      target: "http://localhost:5000"
+    staging:
+      target: "https://left2serve-staging.onrender.com"
     production:
       target: "https://left2serve.onrender.com"
+  ensure:
+    p95: 350
+    p99: 800
+    maxErrorRate: 1
+
 scenarios:
-  - name: "Health check and listings fetch"
+  - name: "Public Browsing & Search Flow"
+    weight: 70
     flow:
       - get:
           url: "/api/health"
       - get:
-          url: "/api/listings"
+          url: "/api/listings?limit=12&category=restaurant"
+      - get:
+          url: "/api/listings/impact"
+      - get:
+          url: "/api/listings/stats"
+
+  - name: "Observability & Telemetry Scrape"
+    weight: 20
+    flow:
+      - get:
+          url: "/metrics"
+      - get:
+          url: "/api/health/notifications"
+
+  - name: "Geospatial Distance Filter Search"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/listings?lat=12.9716&lng=77.5946&distance=15&limit=12"
