@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"left2serve/backend/database"
@@ -120,4 +121,40 @@ func (s *NotificationService) DeleteNotification(ctx context.Context, id, userID
 		return utils.NotFound("Notification not found")
 	}
 	return nil
+}
+
+func (s *NotificationService) SubscribePush(ctx context.Context, userID int, subData any) error {
+	subBytes, err := json.Marshal(subData)
+	if err != nil {
+		return err
+	}
+
+	query := `
+		UPDATE users 
+		SET push_subscriptions = CASE 
+			WHEN push_subscriptions @> $1::jsonb THEN push_subscriptions
+			ELSE push_subscriptions || $1::jsonb
+		END
+		WHERE id = $2`
+
+	_, err = database.DB.ExecContext(ctx, query, fmt.Sprintf("[%s]", string(subBytes)), userID)
+	return err
+}
+
+func (s *NotificationService) UnsubscribePush(ctx context.Context, userID int, endpoint string) error {
+	if endpoint == "" {
+		return nil
+	}
+
+	query := `
+		UPDATE users 
+		SET push_subscriptions = (
+			SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb) 
+			FROM jsonb_array_elements(push_subscriptions) elem 
+			WHERE elem->>'endpoint' != $1
+		)
+		WHERE id = $2`
+
+	_, err := database.DB.ExecContext(ctx, query, endpoint, userID)
+	return err
 }

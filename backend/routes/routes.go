@@ -134,6 +134,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		notifications.PATCH("/read-all", middleware.AuthMiddleware(cfg), controllers.GlobalNotificationController.MarkAllAsRead)
 		notifications.PATCH("/:id/read", middleware.AuthMiddleware(cfg), controllers.GlobalNotificationController.MarkAsRead)
 		notifications.DELETE("/:id", middleware.AuthMiddleware(cfg), controllers.GlobalNotificationController.DeleteNotification)
+		notifications.POST("/subscribe", middleware.AuthMiddleware(cfg), controllers.GlobalNotificationController.SubscribePush)
+		notifications.DELETE("/subscribe", middleware.AuthMiddleware(cfg), controllers.GlobalNotificationController.UnsubscribePush)
 	}
 
 	// --- Reviews Routes ---

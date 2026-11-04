@@ -76,3 +76,38 @@ func (ctl *NotificationController) DeleteNotification(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Notification deleted"})
 }
+
+func (ctl *NotificationController) SubscribePush(c *gin.Context) {
+	userID := c.GetInt("userID")
+	var sub map[string]any
+	if err := c.ShouldBindJSON(&sub); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid push subscription object"})
+		return
+	}
+
+	if err := services.GlobalNotificationService.SubscribePush(c.Request.Context(), userID, sub); err != nil {
+		utils.RespondWithError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Push notification subscription registered"})
+}
+
+func (ctl *NotificationController) UnsubscribePush(c *gin.Context) {
+	userID := c.GetInt("userID")
+	endpoint := c.Query("endpoint")
+	if endpoint == "" {
+		var req struct {
+			Endpoint string `json:"endpoint"`
+		}
+		_ = c.ShouldBindJSON(&req)
+		endpoint = req.Endpoint
+	}
+
+	if err := services.GlobalNotificationService.UnsubscribePush(c.Request.Context(), userID, endpoint); err != nil {
+		utils.RespondWithError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Push notification subscription removed"})
+}

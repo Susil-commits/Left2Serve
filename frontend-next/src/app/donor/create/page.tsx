@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 
 const categories = [
   { value: 'restaurant', label: 'Restaurant', icon: '🍽️', desc: 'Surplus meal preps or daily buffet surplus' },
@@ -40,6 +42,8 @@ export default function CreateListingPage() {
   const [imageUrl, setImageUrl] = useState('');
 
   // States
+  const { user, token } = useAuth();
+  const router = useRouter();
   const [aiGenerating, setAiGenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<number | null>(null);
@@ -135,8 +139,8 @@ export default function CreateListingPage() {
       });
 
       if (res.status === 401 || res.status === 403) {
-        // Unauthenticated or not donor role: redirect to SPA login
-        window.location.href = `${spaUrl}/login?redirect=/donor/create`;
+        // Unauthenticated or not donor role: redirect to Next.js login
+        router.push('/login?redirect=/donor/create');
         return;
       }
 
@@ -203,6 +207,18 @@ export default function CreateListingPage() {
           List surplus kitchen items in seconds. Powered by Gemini AI for auto-formatting.
         </p>
       </div>
+
+      {!user && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span>💡</span>
+            <span>You are drafting as a guest. You will need to sign in as a food donor to publish.</span>
+          </div>
+          <Link href="/login?redirect=/donor/create" className="font-bold underline text-amber-800 hover:text-amber-950">
+            Sign In Now
+          </Link>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700 font-semibold flex items-center gap-2">
